@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcraft Inventory Tracker</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Bitcraft Inventory Tracker</h1>
+        <p class="subtitle">Track your resources and items</p>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div class="add-item">
+                <input type="text" id="item-name" placeholder="Item name" autocomplete="off">
+                <input type="number" id="item-quantity" placeholder="Qty" min="1" value="1">
+                <select id="item-category">
+                    <option value="resources">Resources</option>
+                    <option value="tools">Tools</option>
+                    <option value="materials">Materials</option>
+                    <option value="food">Food</option>
+                    <option value="equipment">Equipment</option>
+                    <option value="other">Other</option>
+                </select>
+                <button id="add-btn">Add Item</button>
+            </div>
+            <div class="search-filter">
+                <input type="text" id="search" placeholder="Search items...">
+                <select id="filter-category">
+                    <option value="all">All Categories</option>
+                    <option value="resources">Resources</option>
+                    <option value="tools">Tools</option>
+                    <option value="materials">Materials</option>
+                    <option value="food">Food</option>
+                    <option value="equipment">Equipment</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="inventory">
+            <div class="inventory-header">
+                <span class="col-name">Item</span>
+                <span class="col-category">Category</span>
+                <span class="col-quantity">Quantity</span>
+                <span class="col-actions">Actions</span>
+            </div>
+            <div id="inventory-list">
+                <!-- Items will be rendered here -->
+            </div>
+        </section>
+
+        <section class="stats">
+            <div class="stat-card">
+                <span class="stat-value" id="total-items">0</span>
+                <span class="stat-label">Unique Items</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="total-quantity">0</span>
+                <span class="stat-label">Total Quantity</span>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <button id="export-btn">Export Data</button>
+        <button id="import-btn">Import Data</button>
+        <input type="file" id="import-file" accept=".json" hidden>
+        <button id="clear-btn">Clear All</button>
+    </footer>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

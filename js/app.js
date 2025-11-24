@@ -250,15 +250,14 @@ class InventoryViewer {
                 const pockets = container.pockets || [];
 
                 for (const pocket of pockets) {
-                    if (!pocket.contents) continue;
+                    // In devalue format:
+                    // - pocket.quantity is the actual quantity (direct number)
+                    // - pocket.contents is the item entity ID (number to look up in items/cargos)
+                    // - pocket.itemId might be string "item" or "cargo"
 
-                    const contents = pocket.contents;
-                    let quantity = contents.quantity;
+                    let quantity = pocket.quantity;
 
-                    // The itemId/item_id may be resolved to an object or still be a number for lookup
-                    const itemData = contents.itemId || contents.item_id;
-
-                    // Handle quantity - it might be resolved correctly, or might need fixing
+                    // Handle quantity - must be a positive number
                     if (typeof quantity !== 'number') {
                         if (typeof quantity === 'string' && /^\d+$/.test(quantity)) {
                             quantity = parseInt(quantity);
@@ -269,15 +268,19 @@ class InventoryViewer {
 
                     if (quantity < 1) continue;
 
-                    // itemData could be the resolved item object or a number for lookup
-                    if (itemData && typeof itemData === 'object' && itemData.name) {
-                        this.extractItemFromDetails(itemData, quantity, items, entityId, locationName);
-                    } else if (typeof itemData === 'number') {
-                        // Look up in items or cargos
-                        const details = itemsLookup[itemData] || cargosLookup[itemData];
-                        if (details) {
-                            this.extractItemFromDetails(details, quantity, items, entityId, locationName);
-                        }
+                    // Get the item entity ID - could be in contents, item_id, or itemId
+                    // After hydration, these should be the actual entity ID number
+                    const itemEntityId = pocket.contents || pocket.item_id;
+
+                    if (!itemEntityId) continue;
+
+                    // Look up item details in the items or cargos lookup
+                    // The lookup keys are entity IDs (numbers or strings)
+                    const details = itemsLookup[itemEntityId] || cargosLookup[itemEntityId] ||
+                                    itemsLookup[String(itemEntityId)] || cargosLookup[String(itemEntityId)];
+
+                    if (details && (details.name || details.itemName)) {
+                        this.extractItemFromDetails(details, quantity, items, entityId, locationName);
                     }
                 }
             }
@@ -289,7 +292,8 @@ class InventoryViewer {
     extractItemFromDetails(itemDetails, quantity, items, playerId, location) {
         if (!itemDetails) return;
 
-        const name = itemDetails.name;
+        // Item name could be in 'name' or 'itemName' field
+        const name = itemDetails.name || itemDetails.itemName;
         const rarity = itemDetails.rarityStr || itemDetails.rarity;
 
         if (name && typeof name === 'string') {

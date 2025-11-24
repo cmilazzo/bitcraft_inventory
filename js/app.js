@@ -830,6 +830,9 @@ class InventoryViewer {
         const allItems = [];
         const packageContents = []; // Track expanded package contents separately
 
+        // First pass: collect all items and build a tag lookup for base items
+        const baseItemTags = new Map(); // baseItemName -> tag
+
         for (const [entityId, playerData] of this.players) {
             for (const item of playerData.items) {
                 allItems.push({
@@ -837,10 +840,25 @@ class InventoryViewer {
                     playerName: playerData.username
                 });
 
-                // If this is a package and expansion is enabled, add virtual items for contents
-                if (this.expandPackages) {
+                // Track tags for base items (non-packages) so we can use them for expanded contents
+                if (!item.name.endsWith(' Package') && item.tag) {
+                    baseItemTags.set(item.name, item.tag);
+                }
+            }
+        }
+
+        // Second pass: expand packages if enabled
+        if (this.expandPackages) {
+            for (const [entityId, playerData] of this.players) {
+                for (const item of playerData.items) {
                     const pkgInfo = this.getPackageInfo(item.name);
                     if (pkgInfo.isPackage) {
+                        // Look up the tag for the base item from our collected items
+                        // or fall back to a reasonable default based on common patterns
+                        const baseItemTag = baseItemTags.get(pkgInfo.baseItemName) ||
+                                           this.inferTagForBaseItem(pkgInfo.baseItemName) ||
+                                           item.tag;
+
                         packageContents.push({
                             name: pkgInfo.baseItemName,
                             tier: item.tier,
@@ -849,7 +867,7 @@ class InventoryViewer {
                             playerId: item.playerId,
                             location: item.location,
                             baseItem: this.getBaseItemName(pkgInfo.baseItemName),
-                            tag: item.tag,
+                            tag: baseItemTag,
                             playerName: playerData.username,
                             fromPackage: true // Mark as coming from a package
                         });
@@ -862,8 +880,52 @@ class InventoryViewer {
         return [...allItems, ...packageContents];
     }
 
+    // Infer the tag/type for a base item based on its name
+    inferTagForBaseItem(itemName) {
+        const baseItemName = this.getBaseItemName(itemName).toLowerCase();
+
+        // Map common base items to their tags
+        const tagMappings = {
+            'filet': 'Food',
+            'brick': 'Construction',
+            'clay lump': 'Construction',
+            'plank': 'Construction',
+            'cloth': 'Textile',
+            'pebbles': 'Construction',
+            'raw meat': 'Food',
+            'bark': 'Forestry',
+            'tannin': 'Leather',
+            'ingot': 'Smithing',
+            'fiber': 'Textile',
+            'leather': 'Leather',
+            'raw pelt': 'Leather',
+            'fish oil': 'Food',
+            'flower': 'Farming',
+            'pitch': 'Forestry',
+            'rope': 'Textile',
+            'vial': 'Alchemy',
+            'parchment': 'Scribing',
+            'pigment': 'Scribing',
+            'ink': 'Scribing',
+            'stone carving': 'Construction'
+        };
+
+        for (const [key, tag] of Object.entries(tagMappings)) {
+            if (baseItemName.includes(key)) {
+                return tag;
+            }
+        }
+
+        return null;
+    }
+
     getFilteredItems() {
         let items = this.getAllItems();
+
+        // If expand packages is enabled, hide the packages themselves (their contents are already added)
+        if (this.expandPackages) {
+            items = items.filter(i => !i.name.endsWith(' Package'));
+        }
 
         // Filter by tier
         const tierFilter = this.filterTierSelect.value;

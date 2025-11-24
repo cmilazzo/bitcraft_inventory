@@ -128,11 +128,18 @@ class InventoryViewer {
         // Load settings first
         this.loadSettingsFromUrl();
 
-        if (!playersParam) return;
+        if (!playersParam) {
+            // Still render to apply any filter/sort settings even without players
+            this.render();
+            return;
+        }
 
         const entityIds = playersParam.split(',').map(id => id.trim()).filter(id => id);
 
-        if (entityIds.length === 0) return;
+        if (entityIds.length === 0) {
+            this.render();
+            return;
+        }
 
         this.showLoading();
 

@@ -42,6 +42,45 @@ class InventoryViewer {
         this.clearBtn.addEventListener('click', () => this.clearAll());
 
         this.render();
+
+        // Check for URL parameters to auto-load players
+        this.loadPlayersFromUrl();
+    }
+
+    // Load players from URL parameter (e.g., ?players=123,456,789)
+    async loadPlayersFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const playersParam = urlParams.get('players');
+
+        if (!playersParam) return;
+
+        const entityIds = playersParam.split(',').map(id => id.trim()).filter(id => id);
+
+        if (entityIds.length === 0) return;
+
+        this.showLoading();
+
+        for (const entityId of entityIds) {
+            try {
+                // First fetch player info to get username
+                const response = await fetch(
+                    `${API_BASE}/players/${entityId}/__data.json?x-sveltekit-invalidated=01`
+                );
+                const json = await response.json();
+                const decoded = this.decodeSvelteKitData(json);
+
+                if (decoded && decoded.player) {
+                    const username = decoded.player.username || `Player ${entityId}`;
+                    const items = await this.fetchPlayerInventory(entityId);
+                    this.players.set(entityId, { username, items });
+                }
+            } catch (error) {
+                console.error(`Error loading player ${entityId}:`, error);
+            }
+        }
+
+        this.render();
+        this.hideLoading();
     }
 
     showLoading() {
@@ -168,6 +207,7 @@ class InventoryViewer {
         try {
             const items = await this.fetchPlayerInventory(entityId);
             this.players.set(entityId, { username, items });
+            this.updateUrl();
             this.render();
         } catch (error) {
             console.error('Error fetching inventory:', error);
@@ -473,7 +513,22 @@ class InventoryViewer {
 
     removePlayer(entityId) {
         this.players.delete(entityId);
+        this.updateUrl();
         this.render();
+    }
+
+    // Update URL with current player IDs
+    updateUrl() {
+        const entityIds = Array.from(this.players.keys());
+        const url = new URL(window.location);
+
+        if (entityIds.length > 0) {
+            url.searchParams.set('players', entityIds.join(','));
+        } else {
+            url.searchParams.delete('players');
+        }
+
+        window.history.replaceState({}, '', url);
     }
 
     async refreshAll() {
@@ -730,6 +785,7 @@ class InventoryViewer {
         if (this.players.size === 0) return;
         if (confirm('Remove all players and clear inventory data?')) {
             this.players.clear();
+            this.updateUrl();
             this.render();
         }
     }

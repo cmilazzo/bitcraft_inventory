@@ -645,7 +645,7 @@ class InventoryViewer {
         const groupBy = this.groupBySelect.value;
 
         if (groupBy === 'none') {
-            this.renderItemTable(aggregated);
+            this.inventoryContent.innerHTML = this.renderItemTable(aggregated);
         } else {
             this.renderGroupedItems(aggregated, groupBy);
         }

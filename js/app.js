@@ -462,8 +462,13 @@ class InventoryViewer {
                 return;
             }
 
-            // Derive tier from item name since the tier field is unreliable
-            const tier = this.deriveTierFromName(name);
+            // Try to get tier from itemDetails first, fall back to name derivation
+            let tier = this.normalizeTier(itemDetails.tier);
+
+            // If normalizeTier returns null (invalid/missing data), derive from name
+            if (tier === null) {
+                tier = this.deriveTierFromName(name);
+            }
 
             // Get base item name by stripping tier prefix
             const baseItem = this.getBaseItemName(name);
@@ -598,11 +603,15 @@ class InventoryViewer {
     }
 
     normalizeTier(tier) {
-        // Handle null/undefined
-        if (tier === undefined || tier === null) return 0;
+        // Handle null/undefined - these are items without tier info
+        if (tier === undefined || tier === null) {
+            return null; // Return null to indicate no tier data
+        }
 
         // Handle boolean (bad data)
-        if (typeof tier === 'boolean') return 0;
+        if (typeof tier === 'boolean') {
+            return null;
+        }
 
         // Handle string tiers
         if (typeof tier === 'string') {
@@ -626,7 +635,7 @@ class InventoryViewer {
             }
             // Try to extract number
             const match = tier.match(/-?\d+/);
-            return match ? parseInt(match[0]) : 0;
+            return match ? parseInt(match[0]) : null;
         }
 
         // Handle number - but some are clearly wrong (like 19998, 6922186)
@@ -635,11 +644,11 @@ class InventoryViewer {
             if (tier >= -1 && tier <= 8) {
                 return tier;
             }
-            // Invalid tier number - return 0
-            return 0;
+            // Invalid tier number
+            return null;
         }
 
-        return 0;
+        return null;
     }
 
     normalizeRarity(rarity) {
@@ -1105,7 +1114,7 @@ class InventoryViewer {
                 </thead>
                 <tbody>
                     ${items.map(item => `
-                        <tr>
+                        <tr class="rarity-row-${(item.rarity || 'common').toLowerCase()}">
                             <td class="item-name">${this.escapeHtml(item.name)}</td>
                             <td><span class="tier-badge">T${item.tier}</span></td>
                             <td class="rarity-${(item.rarity || 'common').toLowerCase()}">${item.rarity || 'Unknown'}</td>

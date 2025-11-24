@@ -20,6 +20,7 @@ class InventoryViewer {
         this.groupBySelect = document.getElementById('group-by');
         this.filterTierSelect = document.getElementById('filter-tier');
         this.filterRaritySelect = document.getElementById('filter-rarity');
+        this.filterTagSelect = document.getElementById('filter-tag');
         this.itemSearchInput = document.getElementById('item-search');
         this.inventoryContent = document.getElementById('inventory-content');
         this.statPlayers = document.getElementById('stat-players');
@@ -38,6 +39,7 @@ class InventoryViewer {
         this.groupBySelect.addEventListener('change', () => this.render());
         this.filterTierSelect.addEventListener('change', () => this.render());
         this.filterRaritySelect.addEventListener('change', () => this.render());
+        this.filterTagSelect.addEventListener('change', () => this.render());
         this.itemSearchInput.addEventListener('input', () => this.render());
         this.refreshBtn.addEventListener('click', () => this.refreshAll());
         this.exportBtn.addEventListener('click', () => this.exportCSV());
@@ -660,6 +662,12 @@ class InventoryViewer {
             items = items.filter(i => i.rarity === rarityFilter);
         }
 
+        // Filter by tag/type
+        const tagFilter = this.filterTagSelect.value;
+        if (tagFilter !== 'all') {
+            items = items.filter(i => i.tag === tagFilter);
+        }
+
         // Filter by search term
         const search = this.itemSearchInput.value.toLowerCase().trim();
         if (search) {
@@ -692,8 +700,36 @@ class InventoryViewer {
 
     render() {
         this.renderPlayerList();
+        this.updateTagFilter();
         this.renderInventory();
         this.updateStats();
+    }
+
+    // Populate the tag filter dropdown with tags from current inventory
+    updateTagFilter() {
+        const allItems = this.getAllItems();
+        const tags = new Set();
+
+        for (const item of allItems) {
+            if (item.tag) {
+                tags.add(item.tag);
+            }
+        }
+
+        // Sort tags alphabetically
+        const sortedTags = Array.from(tags).sort((a, b) => a.localeCompare(b));
+
+        // Keep current selection if still valid
+        const currentValue = this.filterTagSelect.value;
+
+        // Rebuild dropdown
+        this.filterTagSelect.innerHTML = '<option value="all">All Types</option>' +
+            sortedTags.map(tag => `<option value="${this.escapeHtml(tag)}">${this.escapeHtml(tag)}</option>`).join('');
+
+        // Restore selection if still valid
+        if (tags.has(currentValue)) {
+            this.filterTagSelect.value = currentValue;
+        }
     }
 
     renderPlayerList() {

@@ -21,6 +21,8 @@ class InventoryViewer {
         this.filterTierSelect = document.getElementById('filter-tier');
         this.filterRaritySelect = document.getElementById('filter-rarity');
         this.filterTagSelect = document.getElementById('filter-tag');
+        this.sortBySelect = document.getElementById('sort-by');
+        this.sortOrderSelect = document.getElementById('sort-order');
         this.itemSearchInput = document.getElementById('item-search');
         this.inventoryContent = document.getElementById('inventory-content');
         this.statPlayers = document.getElementById('stat-players');
@@ -36,11 +38,13 @@ class InventoryViewer {
         this.playerSearchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.searchPlayer();
         });
-        this.groupBySelect.addEventListener('change', () => this.render());
-        this.filterTierSelect.addEventListener('change', () => this.render());
-        this.filterRaritySelect.addEventListener('change', () => this.render());
-        this.filterTagSelect.addEventListener('change', () => this.render());
-        this.itemSearchInput.addEventListener('input', () => this.render());
+        this.groupBySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.filterTierSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.filterRaritySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.filterTagSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.sortBySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.sortOrderSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.itemSearchInput.addEventListener('input', () => { this.render(); this.updateUrl(); });
         this.refreshBtn.addEventListener('click', () => this.refreshAll());
         this.exportBtn.addEventListener('click', () => this.exportCSV());
         this.clearBtn.addEventListener('click', () => this.clearAll());
@@ -79,10 +83,50 @@ class InventoryViewer {
         }
     }
 
+    // Load settings from URL parameters
+    loadSettingsFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        // Load filter/sort settings
+        const groupBy = urlParams.get('groupBy');
+        const filterTier = urlParams.get('tier');
+        const filterRarity = urlParams.get('rarity');
+        const filterTag = urlParams.get('type');
+        const sortBy = urlParams.get('sortBy');
+        const sortOrder = urlParams.get('order');
+        const search = urlParams.get('search');
+
+        // Apply settings to dropdowns
+        if (groupBy && this.groupBySelect.querySelector(`option[value="${groupBy}"]`)) {
+            this.groupBySelect.value = groupBy;
+        }
+        if (filterTier && this.filterTierSelect.querySelector(`option[value="${filterTier}"]`)) {
+            this.filterTierSelect.value = filterTier;
+        }
+        if (filterRarity && this.filterRaritySelect.querySelector(`option[value="${filterRarity}"]`)) {
+            this.filterRaritySelect.value = filterRarity;
+        }
+        if (sortBy && this.sortBySelect.querySelector(`option[value="${sortBy}"]`)) {
+            this.sortBySelect.value = sortBy;
+        }
+        if (sortOrder && this.sortOrderSelect.querySelector(`option[value="${sortOrder}"]`)) {
+            this.sortOrderSelect.value = sortOrder;
+        }
+        if (search) {
+            this.itemSearchInput.value = search;
+        }
+
+        // Store tag filter to apply after items load (tag options are dynamic)
+        this.pendingTagFilter = filterTag;
+    }
+
     // Load players from URL parameter (e.g., ?players=123,456,789)
     async loadPlayersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const playersParam = urlParams.get('players');
+
+        // Load settings first
+        this.loadSettingsFromUrl();
 
         if (!playersParam) return;
 
@@ -111,7 +155,19 @@ class InventoryViewer {
             }
         }
 
-        this.render();
+        // Apply pending tag filter now that items are loaded
+        if (this.pendingTagFilter) {
+            // Tag options will be populated by render(), so we set it after
+            this.render();
+            if (this.filterTagSelect.querySelector(`option[value="${this.pendingTagFilter}"]`)) {
+                this.filterTagSelect.value = this.pendingTagFilter;
+            }
+            this.pendingTagFilter = null;
+            this.render(); // Re-render with tag filter applied
+        } else {
+            this.render();
+        }
+
         this.hideLoading();
     }
 
@@ -602,15 +658,72 @@ class InventoryViewer {
         this.render();
     }
 
-    // Update URL with current player IDs
+    // Update URL with current player IDs and all filter/sort settings
     updateUrl() {
         const entityIds = Array.from(this.players.keys());
         const url = new URL(window.location);
 
+        // Players
         if (entityIds.length > 0) {
             url.searchParams.set('players', entityIds.join(','));
         } else {
             url.searchParams.delete('players');
+        }
+
+        // Group By
+        const groupBy = this.groupBySelect.value;
+        if (groupBy !== 'none') {
+            url.searchParams.set('groupBy', groupBy);
+        } else {
+            url.searchParams.delete('groupBy');
+        }
+
+        // Filter Tier
+        const filterTier = this.filterTierSelect.value;
+        if (filterTier !== 'all') {
+            url.searchParams.set('tier', filterTier);
+        } else {
+            url.searchParams.delete('tier');
+        }
+
+        // Filter Rarity
+        const filterRarity = this.filterRaritySelect.value;
+        if (filterRarity !== 'all') {
+            url.searchParams.set('rarity', filterRarity);
+        } else {
+            url.searchParams.delete('rarity');
+        }
+
+        // Filter Tag/Type
+        const filterTag = this.filterTagSelect.value;
+        if (filterTag !== 'all') {
+            url.searchParams.set('type', filterTag);
+        } else {
+            url.searchParams.delete('type');
+        }
+
+        // Sort By
+        const sortBy = this.sortBySelect.value;
+        if (sortBy !== 'name') {
+            url.searchParams.set('sortBy', sortBy);
+        } else {
+            url.searchParams.delete('sortBy');
+        }
+
+        // Sort Order
+        const sortOrder = this.sortOrderSelect.value;
+        if (sortOrder !== 'asc') {
+            url.searchParams.set('order', sortOrder);
+        } else {
+            url.searchParams.delete('order');
+        }
+
+        // Search
+        const search = this.itemSearchInput.value.trim();
+        if (search) {
+            url.searchParams.set('search', search);
+        } else {
+            url.searchParams.delete('search');
         }
 
         window.history.replaceState({}, '', url);
@@ -771,13 +884,37 @@ class InventoryViewer {
     }
 
     renderItemTable(items, showPlayer = true) {
-        // Sort by tier (ascending) then name when grouped by baseItem, otherwise by name
+        // Sort items based on sort dropdown
+        const sortBy = this.sortBySelect.value;
+        const sortOrder = this.sortOrderSelect.value;
         const groupBy = this.groupBySelect.value;
-        if (groupBy === 'baseItem') {
-            items.sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
-        } else {
-            items.sort((a, b) => a.name.localeCompare(b.name));
-        }
+
+        // Rarity order for sorting
+        const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
+
+        items.sort((a, b) => {
+            let comparison = 0;
+
+            if (sortBy === 'name') {
+                comparison = a.name.localeCompare(b.name);
+            } else if (sortBy === 'tier') {
+                comparison = a.tier - b.tier;
+                if (comparison === 0) comparison = a.name.localeCompare(b.name);
+            } else if (sortBy === 'rarity') {
+                comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
+                if (comparison === 0) comparison = a.name.localeCompare(b.name);
+            } else if (sortBy === 'count') {
+                comparison = a.count - b.count;
+                if (comparison === 0) comparison = a.name.localeCompare(b.name);
+            }
+
+            // For baseItem grouping, always sort by tier within groups
+            if (groupBy === 'baseItem' && sortBy === 'name') {
+                comparison = a.tier - b.tier || a.name.localeCompare(b.name);
+            }
+
+            return sortOrder === 'desc' ? -comparison : comparison;
+        });
 
         const showPlayerColumn = showPlayer && this.players.size > 1 && this.groupBySelect.value !== 'player';
 

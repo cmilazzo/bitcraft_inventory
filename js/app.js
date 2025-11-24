@@ -3,11 +3,40 @@
 
 const API_BASE = 'https://young-base-bcd2.chris-milazzo.workers.dev/proxy';
 
+// Package contents mapping: base item suffix -> quantity per package
+// Package names follow pattern: "[Tier Prefix] [Base Item] Package"
+// e.g., "Simple Clay Lump Package" contains 500 "Simple Clay Lump"
+const PACKAGE_CONTENTS = {
+    'Filet Package': 500,
+    'Brick Package': 100,
+    'Clay Lump Package': 500,
+    'Plank Package': 100,
+    'Cloth Package': 100,
+    'Pebbles Package': 1000,
+    'Raw Meat Package': 500,
+    'Bark Package': 500,
+    'Tannin Package': 500,
+    'Ingot Package': 100,
+    'Fiber Package': 1000,
+    'Leather Package': 100,
+    'Raw Pelt Package': 100,
+    'Fish Oil Package': 500,
+    'Flower Package': 500,
+    'Pitch Package': 500,
+    'Rope Package': 100,
+    'Vial Package': 100,
+    'Parchment Package': 200,
+    'Pigment Package': 200,
+    'Ink Package': 200,
+    'Stone Carving Package': 100
+};
+
 class InventoryViewer {
     constructor() {
         this.players = new Map(); // entityId -> { username, items: [] }
         this.itemDatabase = new Map(); // itemId -> { name, tier, rarity, ... }
         this.itemDatabaseLoaded = false;
+        this.expandPackages = true; // Whether to add package contents to base item counts
         this.init();
     }
 
@@ -32,6 +61,7 @@ class InventoryViewer {
         this.exportBtn = document.getElementById('export-btn');
         this.clearBtn = document.getElementById('clear-btn');
         this.loadingOverlay = document.getElementById('loading-overlay');
+        this.expandPackagesCheckbox = document.getElementById('expand-packages');
 
         // Event listeners
         this.searchBtn.addEventListener('click', () => this.searchPlayer());
@@ -42,9 +72,14 @@ class InventoryViewer {
         this.filterTierSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
         this.filterRaritySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
         this.filterTagSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
-        this.sortBySelect.addEventListener('change', () => { console.log('sortBy changed to:', this.sortBySelect.value); this.render(); this.updateUrl(); });
-        this.sortOrderSelect.addEventListener('change', () => { console.log('sortOrder changed to:', this.sortOrderSelect.value); this.render(); this.updateUrl(); });
+        this.sortBySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.sortOrderSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
         this.itemSearchInput.addEventListener('input', () => { this.render(); this.updateUrl(); });
+        this.expandPackagesCheckbox.addEventListener('change', () => {
+            this.expandPackages = this.expandPackagesCheckbox.checked;
+            this.render();
+            this.updateUrl();
+        });
         this.refreshBtn.addEventListener('click', () => this.refreshAll());
         this.exportBtn.addEventListener('click', () => this.exportCSV());
         this.clearBtn.addEventListener('click', () => this.clearAll());
@@ -95,6 +130,7 @@ class InventoryViewer {
         const sortBy = urlParams.get('sortBy');
         const sortOrder = urlParams.get('order');
         const search = urlParams.get('search');
+        const expandPkg = urlParams.get('expand');
 
         // Apply settings to dropdowns
         if (groupBy && this.groupBySelect.querySelector(`option[value="${groupBy}"]`)) {
@@ -114,6 +150,12 @@ class InventoryViewer {
         }
         if (search) {
             this.itemSearchInput.value = search;
+        }
+
+        // Apply expand packages setting (default is true/checked)
+        if (expandPkg !== null) {
+            this.expandPackages = expandPkg !== '0';
+            this.expandPackagesCheckbox.checked = this.expandPackages;
         }
 
         // Store tag filter to apply after items load (tag options are dynamic)
@@ -733,6 +775,13 @@ class InventoryViewer {
             url.searchParams.delete('search');
         }
 
+        // Expand Packages (default is true, so only save when false)
+        if (!this.expandPackages) {
+            url.searchParams.set('expand', '0');
+        } else {
+            url.searchParams.delete('expand');
+        }
+
         window.history.replaceState({}, '', url);
     }
 
@@ -754,17 +803,63 @@ class InventoryViewer {
         this.hideLoading();
     }
 
+    // Check if item is a package and return info about its contents
+    // Returns { isPackage: true, baseItemName, quantityPer } or { isPackage: false }
+    getPackageInfo(itemName) {
+        if (!itemName.endsWith(' Package')) {
+            return { isPackage: false };
+        }
+
+        // Find which package type this matches
+        for (const [packageSuffix, quantity] of Object.entries(PACKAGE_CONTENTS)) {
+            if (itemName.endsWith(packageSuffix)) {
+                // Extract the base item name by removing " Package" from the end
+                const baseItemName = itemName.slice(0, -8); // Remove " Package"
+                return {
+                    isPackage: true,
+                    baseItemName,
+                    quantityPer: quantity
+                };
+            }
+        }
+
+        return { isPackage: false };
+    }
+
     getAllItems() {
         const allItems = [];
+        const packageContents = []; // Track expanded package contents separately
+
         for (const [entityId, playerData] of this.players) {
             for (const item of playerData.items) {
                 allItems.push({
                     ...item,
                     playerName: playerData.username
                 });
+
+                // If this is a package and expansion is enabled, add virtual items for contents
+                if (this.expandPackages) {
+                    const pkgInfo = this.getPackageInfo(item.name);
+                    if (pkgInfo.isPackage) {
+                        packageContents.push({
+                            name: pkgInfo.baseItemName,
+                            tier: item.tier,
+                            rarity: item.rarity,
+                            count: item.count * pkgInfo.quantityPer,
+                            playerId: item.playerId,
+                            location: item.location,
+                            baseItem: this.getBaseItemName(pkgInfo.baseItemName),
+                            tag: item.tag,
+                            playerName: playerData.username,
+                            fromPackage: true // Mark as coming from a package
+                        });
+                    }
+                }
             }
         }
-        return allItems;
+
+        // Add package contents to the items list
+        return [...allItems, ...packageContents];
     }
 
     getFilteredItems() {

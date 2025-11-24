@@ -6,10 +6,12 @@ const API_BASE = 'https://young-base-bcd2.chris-milazzo.workers.dev/proxy';
 class InventoryViewer {
     constructor() {
         this.players = new Map(); // entityId -> { username, items: [] }
+        this.itemDatabase = new Map(); // itemId -> { name, tier, rarity, ... }
+        this.itemDatabaseLoaded = false;
         this.init();
     }
 
-    init() {
+    async init() {
         // DOM elements
         this.playerSearchInput = document.getElementById('player-search');
         this.searchBtn = document.getElementById('search-btn');
@@ -43,8 +45,36 @@ class InventoryViewer {
 
         this.render();
 
-        // Check for URL parameters to auto-load players
+        // Load item database first, then check for URL parameters
+        await this.loadItemDatabase();
         this.loadPlayersFromUrl();
+    }
+
+    // Load the item database from bitjita.com
+    async loadItemDatabase() {
+        try {
+            const response = await fetch(`${API_BASE}/items/__data.json`);
+            const json = await response.json();
+            const decoded = this.decodeSvelteKitData(json);
+
+            if (decoded && decoded.items && Array.isArray(decoded.items)) {
+                for (const item of decoded.items) {
+                    if (item && item.id) {
+                        this.itemDatabase.set(String(item.id), {
+                            name: item.name || item.itemName,
+                            tier: item.tier,
+                            rarity: item.rarityStr || item.rarity,
+                            tag: item.tag
+                        });
+                    }
+                }
+                console.log(`Loaded ${this.itemDatabase.size} items into database`);
+            }
+            this.itemDatabaseLoaded = true;
+        } catch (error) {
+            console.error('Error loading item database:', error);
+            this.itemDatabaseLoaded = false;
+        }
     }
 
     // Load players from URL parameter (e.g., ?players=123,456,789)
@@ -250,12 +280,31 @@ class InventoryViewer {
                 const pockets = container.pockets || [];
 
                 for (const pocket of pockets) {
-                    // In devalue format:
-                    // - pocket.quantity is the actual quantity (direct number)
-                    // - pocket.contents is the item entity ID (number to look up in items/cargos)
-                    // - pocket.itemId might be string "item" or "cargo"
+                    // After devalue hydration, pocket structure can be:
+                    // Option A: { locked, volume, contents: { itemId, quantity, ... } }
+                    // Option B: { locked, volume, quantity, contents/item_id: entityId }
 
-                    let quantity = pocket.quantity;
+                    let quantity;
+                    let itemEntityId;
+                    let itemDetails = null;
+
+                    const contents = pocket.contents;
+
+                    if (contents && typeof contents === 'object') {
+                        // Option A: contents is an object with quantity and itemId
+                        quantity = contents.quantity;
+                        itemEntityId = contents.itemId || contents.item_id;
+
+                        // The itemId might be a number that references the items/cargos lookup
+                        // OR the contents object itself might have item details
+                        if (contents.name || contents.itemName) {
+                            itemDetails = contents;
+                        }
+                    } else {
+                        // Option B: quantity is on pocket, contents is the entity ID
+                        quantity = pocket.quantity;
+                        itemEntityId = contents || pocket.item_id;
+                    }
 
                     // Handle quantity - must be a positive number
                     if (typeof quantity !== 'number') {
@@ -268,19 +317,23 @@ class InventoryViewer {
 
                     if (quantity < 1) continue;
 
-                    // Get the item entity ID - could be in contents, item_id, or itemId
-                    // After hydration, these should be the actual entity ID number
-                    const itemEntityId = pocket.contents || pocket.item_id;
+                    // If we don't have item details yet, look them up in various places
+                    if (!itemDetails && itemEntityId) {
+                        // First try the player data's items/cargos lookup
+                        itemDetails = itemsLookup[itemEntityId] || cargosLookup[itemEntityId] ||
+                                      itemsLookup[String(itemEntityId)] || cargosLookup[String(itemEntityId)];
 
-                    if (!itemEntityId) continue;
+                        // If not found, try the global item database
+                        if (!itemDetails || (!itemDetails.name && !itemDetails.itemName)) {
+                            const dbItem = this.itemDatabase.get(String(itemEntityId));
+                            if (dbItem) {
+                                itemDetails = dbItem;
+                            }
+                        }
+                    }
 
-                    // Look up item details in the items or cargos lookup
-                    // The lookup keys are entity IDs (numbers or strings)
-                    const details = itemsLookup[itemEntityId] || cargosLookup[itemEntityId] ||
-                                    itemsLookup[String(itemEntityId)] || cargosLookup[String(itemEntityId)];
-
-                    if (details && (details.name || details.itemName)) {
-                        this.extractItemFromDetails(details, quantity, items, entityId, locationName);
+                    if (itemDetails && (itemDetails.name || itemDetails.itemName)) {
+                        this.extractItemFromDetails(itemDetails, quantity, items, entityId, locationName);
                     }
                 }
             }

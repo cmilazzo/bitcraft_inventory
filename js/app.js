@@ -42,8 +42,8 @@ class InventoryViewer {
         this.filterTierSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
         this.filterRaritySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
         this.filterTagSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
-        this.sortBySelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
-        this.sortOrderSelect.addEventListener('change', () => { this.render(); this.updateUrl(); });
+        this.sortBySelect.addEventListener('change', () => { console.log('sortBy changed to:', this.sortBySelect.value); this.render(); this.updateUrl(); });
+        this.sortOrderSelect.addEventListener('change', () => { console.log('sortOrder changed to:', this.sortOrderSelect.value); this.render(); this.updateUrl(); });
         this.itemSearchInput.addEventListener('input', () => { this.render(); this.updateUrl(); });
         this.refreshBtn.addEventListener('click', () => this.refreshAll());
         this.exportBtn.addEventListener('click', () => this.exportCSV());

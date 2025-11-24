@@ -1,152 +1,737 @@
-// Bitcraft Inventory Tracker
-class InventoryTracker {
+// Bitcraft Inventory Viewer
+// Fetches data from bitjita.com API and displays aggregated inventory
+
+const API_BASE = 'https://young-base-bcd2.chris-milazzo.workers.dev/proxy';
+
+class InventoryViewer {
     constructor() {
-        this.inventory = this.loadInventory();
+        this.players = new Map(); // entityId -> { username, items: [] }
         this.init();
     }
 
     init() {
         // DOM elements
-        this.itemNameInput = document.getElementById('item-name');
-        this.itemQuantityInput = document.getElementById('item-quantity');
-        this.itemCategorySelect = document.getElementById('item-category');
-        this.addBtn = document.getElementById('add-btn');
-        this.searchInput = document.getElementById('search');
-        this.filterCategorySelect = document.getElementById('filter-category');
-        this.inventoryList = document.getElementById('inventory-list');
-        this.totalItemsEl = document.getElementById('total-items');
-        this.totalQuantityEl = document.getElementById('total-quantity');
+        this.playerSearchInput = document.getElementById('player-search');
+        this.searchBtn = document.getElementById('search-btn');
+        this.searchResults = document.getElementById('search-results');
+        this.playerList = document.getElementById('player-list');
+        this.groupBySelect = document.getElementById('group-by');
+        this.filterTierSelect = document.getElementById('filter-tier');
+        this.filterRaritySelect = document.getElementById('filter-rarity');
+        this.itemSearchInput = document.getElementById('item-search');
+        this.inventoryContent = document.getElementById('inventory-content');
+        this.statPlayers = document.getElementById('stat-players');
+        this.statUnique = document.getElementById('stat-unique');
+        this.statTotal = document.getElementById('stat-total');
+        this.refreshBtn = document.getElementById('refresh-btn');
         this.exportBtn = document.getElementById('export-btn');
-        this.importBtn = document.getElementById('import-btn');
-        this.importFile = document.getElementById('import-file');
         this.clearBtn = document.getElementById('clear-btn');
+        this.loadingOverlay = document.getElementById('loading-overlay');
 
         // Event listeners
-        this.addBtn.addEventListener('click', () => this.addItem());
-        this.itemNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.addItem();
+        this.searchBtn.addEventListener('click', () => this.searchPlayer());
+        this.playerSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.searchPlayer();
         });
-        this.searchInput.addEventListener('input', () => this.render());
-        this.filterCategorySelect.addEventListener('change', () => this.render());
-        this.exportBtn.addEventListener('click', () => this.exportData());
-        this.importBtn.addEventListener('click', () => this.importFile.click());
-        this.importFile.addEventListener('change', (e) => this.importData(e));
+        this.groupBySelect.addEventListener('change', () => this.render());
+        this.filterTierSelect.addEventListener('change', () => this.render());
+        this.filterRaritySelect.addEventListener('change', () => this.render());
+        this.itemSearchInput.addEventListener('input', () => this.render());
+        this.refreshBtn.addEventListener('click', () => this.refreshAll());
+        this.exportBtn.addEventListener('click', () => this.exportCSV());
         this.clearBtn.addEventListener('click', () => this.clearAll());
 
         this.render();
     }
 
-    loadInventory() {
-        const saved = localStorage.getItem('bitcraft-inventory');
-        return saved ? JSON.parse(saved) : [];
+    showLoading() {
+        this.loadingOverlay.classList.remove('hidden');
     }
 
-    saveInventory() {
-        localStorage.setItem('bitcraft-inventory', JSON.stringify(this.inventory));
+    hideLoading() {
+        this.loadingOverlay.classList.add('hidden');
     }
 
-    addItem() {
-        const name = this.itemNameInput.value.trim();
-        const quantity = parseInt(this.itemQuantityInput.value) || 1;
-        const category = this.itemCategorySelect.value;
+    // Decode SvelteKit __data.json format (devalue format)
+    // In devalue format, all numbers in objects are references to indices in the data array
+    // The actual values are stored in the data array itself
+    decodeSvelteKitData(json) {
+        if (!json || !json.nodes) return null;
 
-        if (!name) {
-            this.itemNameInput.focus();
+        // Find the data node
+        const dataNode = json.nodes.find(n => n.type === 'data' && n.data);
+        if (!dataNode) return null;
+
+        const data = dataNode.data;
+        const hydrated = new Array(data.length);
+
+        // Hydrate a value at a given index
+        const hydrate = (index) => {
+            // Special devalue codes (negative numbers)
+            if (index === -1) return undefined;
+            if (index === -3) return NaN;
+            if (index === -4) return Infinity;
+            if (index === -5) return -Infinity;
+            if (index === -6) return -0;
+
+            // Already hydrated
+            if (index in hydrated) {
+                return hydrated[index];
+            }
+
+            const value = data[index];
+
+            // Primitives - return as-is
+            if (typeof value === 'string' || typeof value === 'boolean' || value === null) {
+                hydrated[index] = value;
+                return value;
+            }
+
+            // Numbers in the data array are literal values
+            if (typeof value === 'number') {
+                hydrated[index] = value;
+                return value;
+            }
+
+            // Arrays - hydrate each element (elements are references)
+            if (Array.isArray(value)) {
+                const arr = [];
+                hydrated[index] = arr; // Store early for circular refs
+                for (const ref of value) {
+                    arr.push(hydrate(ref));
+                }
+                return arr;
+            }
+
+            // Objects - hydrate each property value (values are references)
+            if (typeof value === 'object') {
+                const obj = {};
+                hydrated[index] = obj; // Store early for circular refs
+                for (const [key, ref] of Object.entries(value)) {
+                    obj[key] = hydrate(ref);
+                }
+                return obj;
+            }
+
+            return value;
+        };
+
+        return hydrate(0);
+    }
+
+    async searchPlayer() {
+        const query = this.playerSearchInput.value.trim();
+        if (!query) return;
+
+        this.showLoading();
+        this.searchResults.innerHTML = '';
+
+        try {
+            const response = await fetch(
+                `${API_BASE}/players/__data.json?q=${encodeURIComponent(query)}&x-sveltekit-invalidated=01`
+            );
+            const json = await response.json();
+            const decoded = this.decodeSvelteKitData(json);
+
+            if (!decoded || !decoded.players || decoded.players.length === 0) {
+                this.searchResults.innerHTML = '<p class="error-message">No players found.</p>';
+                this.hideLoading();
+                return;
+            }
+
+            this.searchResults.innerHTML = decoded.players.map(player => `
+                <div class="search-result-item">
+                    <span>${this.escapeHtml(player.username)}</span>
+                    <button onclick="viewer.addPlayer('${player.entityId}', '${this.escapeHtml(player.username)}')">
+                        Add
+                    </button>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Search error:', error);
+            this.searchResults.innerHTML = '<p class="error-message">Error searching for player. Try again.</p>';
+        }
+
+        this.hideLoading();
+    }
+
+    async addPlayer(entityId, username) {
+        if (this.players.has(entityId)) {
+            alert(`${username} is already added.`);
             return;
         }
 
-        // Check if item already exists (case-insensitive)
-        const existingIndex = this.inventory.findIndex(
-            item => item.name.toLowerCase() === name.toLowerCase() && item.category === category
-        );
+        this.showLoading();
+        this.searchResults.innerHTML = '';
+        this.playerSearchInput.value = '';
 
-        if (existingIndex !== -1) {
-            this.inventory[existingIndex].quantity += quantity;
-        } else {
-            this.inventory.push({
-                id: Date.now(),
-                name,
-                quantity,
-                category
+        try {
+            const items = await this.fetchPlayerInventory(entityId);
+            this.players.set(entityId, { username, items });
+            this.render();
+        } catch (error) {
+            console.error('Error fetching inventory:', error);
+            alert(`Error loading inventory for ${username}.`);
+        }
+
+        this.hideLoading();
+    }
+
+    async fetchPlayerInventory(entityId) {
+        const response = await fetch(
+            `${API_BASE}/players/${entityId}/__data.json?x-sveltekit-invalidated=01`
+        );
+        const json = await response.json();
+        const decoded = this.decodeSvelteKitData(json);
+
+        if (!decoded) {
+            throw new Error('Failed to decode player data');
+        }
+
+        const items = [];
+
+        // Structure: decoded.inventories = { inventories: [...containers], items: {...}, cargos: {...} }
+        if (decoded.inventories && typeof decoded.inventories === 'object') {
+            const invData = decoded.inventories;
+            const containers = invData.inventories || [];
+            const itemsLookup = invData.items || {};
+            const cargosLookup = invData.cargos || {};
+
+            // Containers to skip (equipped items, not actual inventory)
+            const skipContainers = new Set(['Wallet', 'Toolbelt']);
+
+            // Process each inventory container (Storage, Bank, etc.)
+            for (const container of containers) {
+                const locationName = container.inventoryName || container.name || 'Unknown';
+
+                // Skip Wallet and Toolbelt - these are equipped items, not inventory
+                if (skipContainers.has(locationName)) continue;
+
+                const pockets = container.pockets || [];
+
+                for (const pocket of pockets) {
+                    if (!pocket.contents) continue;
+
+                    const contents = pocket.contents;
+                    let quantity = contents.quantity;
+
+                    // The itemId/item_id may be resolved to an object or still be a number for lookup
+                    const itemData = contents.itemId || contents.item_id;
+
+                    // Handle quantity - it might be resolved correctly, or might need fixing
+                    if (typeof quantity !== 'number') {
+                        if (typeof quantity === 'string' && /^\d+$/.test(quantity)) {
+                            quantity = parseInt(quantity);
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    if (quantity < 1) continue;
+
+                    // itemData could be the resolved item object or a number for lookup
+                    if (itemData && typeof itemData === 'object' && itemData.name) {
+                        this.extractItemFromDetails(itemData, quantity, items, entityId, locationName);
+                    } else if (typeof itemData === 'number') {
+                        // Look up in items or cargos
+                        const details = itemsLookup[itemData] || cargosLookup[itemData];
+                        if (details) {
+                            this.extractItemFromDetails(details, quantity, items, entityId, locationName);
+                        }
+                    }
+                }
+            }
+        }
+
+        return items;
+    }
+
+    extractItemFromDetails(itemDetails, quantity, items, playerId, location) {
+        if (!itemDetails) return;
+
+        const name = itemDetails.name;
+        const rarity = itemDetails.rarityStr || itemDetails.rarity;
+
+        if (name && typeof name === 'string') {
+            // Filter out non-inventory items (skills, badges, cosmetics, etc.)
+            if (this.shouldSkipItem(name)) {
+                return;
+            }
+
+            // Derive tier from item name since the tier field is unreliable
+            const tier = this.deriveTierFromName(name);
+
+            items.push({
+                name: name,
+                tier: tier,
+                rarity: this.normalizeRarity(rarity),
+                count: quantity,
+                playerId,
+                location
+            });
+        }
+    }
+
+    deriveTierFromName(name) {
+        // Tier prefixes in item names
+        const tierPrefixes = {
+            'Rough': 0,
+            'Primitive': 0,
+            'Basic': 1,
+            'Simple': 2,
+            'Improved': 2,
+            'Sturdy': 3,
+            'Quality': 3,
+            'Infused': 3,
+            'Fine': 4,
+            'Essential': 4,
+            'Superior': 5,
+            'Exquisite': 5,
+            'Succulent': 5,
+            'Peerless': 6,
+            'Ornate': 7,
+            'Ambrosial': 6,
+            'Flavorful': 7,
+            'Aurumite': 7,
+            'Pristine': 8,
+            'Celestium': 8,
+            'Luminite': 5,
+            'Rathium': 6,
+            'Zesty': 3,
+            'Plain': 0,
+            'Novice': 2
+        };
+
+        for (const [prefix, tier] of Object.entries(tierPrefixes)) {
+            if (name.startsWith(prefix + ' ')) {
+                return tier;
+            }
+        }
+
+        // Check for special items
+        if (name.includes('Hex Coin')) return -1;
+        if (name.includes('Ancient Metal')) return -1;
+
+        // Default
+        return 0;
+    }
+
+    extractItem(item, items, playerId, location = 'Unknown') {
+        if (!item) return;
+
+        // Check if item has name (field is 'name') and rarityStr
+        const name = item.name;
+        const rarity = item.rarityStr || item.rarity;
+        const tier = item.tier;
+        const quantity = item.quantity || item.count || 1;
+
+        if (name && typeof name === 'string') {
+            // Filter out non-inventory items (skills, badges, cosmetics, etc.)
+            if (this.shouldSkipItem(name)) {
+                return;
+            }
+
+            items.push({
+                name: name,
+                tier: this.normalizeTier(tier),
+                rarity: this.normalizeRarity(rarity),
+                count: quantity,
+                playerId,
+                location
+            });
+        }
+    }
+
+    shouldSkipItem(name) {
+        // Prefixes that indicate non-inventory items (skills, badges, cosmetics)
+        const skipPrefixes = [
+            'Professional',
+            'Collectible',
+            'Adept',
+            'Apprentice',
+            'Novice',
+            'Expert',
+            'Master',
+            'Grandmaster',
+            'Legendary',  // As a prefix for skills
+            'Mythical',   // As a prefix for skills
+        ];
+
+        // Check if name starts with any skip prefix
+        for (const prefix of skipPrefixes) {
+            if (name.startsWith(prefix + ' ')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    normalizeTier(tier) {
+        // Handle null/undefined
+        if (tier === undefined || tier === null) return 0;
+
+        // Handle boolean (bad data)
+        if (typeof tier === 'boolean') return 0;
+
+        // Handle string tiers
+        if (typeof tier === 'string') {
+            // Check for tier names that map to numbers
+            const tierMap = {
+                'Primitive': 0,
+                'Basic': 1,
+                'Improved': 2,
+                'Quality': 3,
+                'Fine': 4,
+                'Superior': 5,
+                'Ornate': 6,
+                'Aurumite': 7,
+                'Celestium': 8,
+                'Currency': -1,
+                'Special': -1
+            };
+            // Check if it's a known tier name
+            for (const [name, num] of Object.entries(tierMap)) {
+                if (tier.includes(name)) return num;
+            }
+            // Try to extract number
+            const match = tier.match(/-?\d+/);
+            return match ? parseInt(match[0]) : 0;
+        }
+
+        // Handle number - but some are clearly wrong (like 19998, 6922186)
+        // Valid tiers are -1 to 8
+        if (typeof tier === 'number') {
+            if (tier >= -1 && tier <= 8) {
+                return tier;
+            }
+            // Invalid tier number - return 0
+            return 0;
+        }
+
+        return 0;
+    }
+
+    normalizeRarity(rarity) {
+        if (!rarity) return 'Common';
+        if (typeof rarity !== 'string') return 'Common';
+        // Normalize rarity string
+        const r = rarity.trim();
+        if (r.includes('Common')) return 'Common';
+        if (r.includes('Uncommon')) return 'Uncommon';
+        if (r.includes('Rare')) return 'Rare';
+        if (r.includes('Epic')) return 'Epic';
+        if (r.includes('Legendary')) return 'Legendary';
+        if (r.includes('Mythic')) return 'Mythic';
+        return r;
+    }
+
+    extractItems(obj, items, playerId, seen = new Set()) {
+        if (!obj || typeof obj !== 'object') return;
+
+        // Prevent circular reference issues
+        const objId = JSON.stringify(obj).substring(0, 100);
+        if (seen.has(objId)) return;
+        seen.add(objId);
+
+        // Check if this object looks like an inventory item
+        if (obj.name && obj.tier !== undefined && obj.rarity) {
+            const quantity = obj.quantity || obj.count || 1;
+            items.push({
+                name: String(obj.name),
+                tier: obj.tier,
+                rarity: String(obj.rarity),
+                count: quantity,
+                playerId
+            });
+            return;
+        }
+
+        // Check for contents array with item data
+        if (obj.contents && obj.contents.name && obj.contents.rarity) {
+            const quantity = obj.contents.quantity || obj.contents.count || 1;
+            items.push({
+                name: String(obj.contents.name),
+                tier: obj.contents.tier,
+                rarity: String(obj.contents.rarity),
+                count: quantity,
+                playerId
             });
         }
 
-        this.saveInventory();
-        this.render();
-
-        // Clear inputs
-        this.itemNameInput.value = '';
-        this.itemQuantityInput.value = '1';
-        this.itemNameInput.focus();
-    }
-
-    updateQuantity(id, delta) {
-        const item = this.inventory.find(i => i.id === id);
-        if (item) {
-            item.quantity += delta;
-            if (item.quantity <= 0) {
-                this.deleteItem(id);
-            } else {
-                this.saveInventory();
-                this.render();
+        // Recursively search through arrays and objects
+        if (Array.isArray(obj)) {
+            obj.forEach(item => this.extractItems(item, items, playerId, seen));
+        } else {
+            for (const value of Object.values(obj)) {
+                if (value && typeof value === 'object') {
+                    this.extractItems(value, items, playerId, seen);
+                }
             }
         }
     }
 
-    deleteItem(id) {
-        this.inventory = this.inventory.filter(i => i.id !== id);
-        this.saveInventory();
+    removePlayer(entityId) {
+        this.players.delete(entityId);
         this.render();
     }
 
-    getFilteredInventory() {
-        const search = this.searchInput.value.toLowerCase();
-        const category = this.filterCategorySelect.value;
+    async refreshAll() {
+        if (this.players.size === 0) return;
 
-        return this.inventory.filter(item => {
-            const matchesSearch = item.name.toLowerCase().includes(search);
-            const matchesCategory = category === 'all' || item.category === category;
-            return matchesSearch && matchesCategory;
-        });
+        this.showLoading();
+
+        for (const [entityId, playerData] of this.players) {
+            try {
+                const items = await this.fetchPlayerInventory(entityId);
+                playerData.items = items;
+            } catch (error) {
+                console.error(`Error refreshing ${playerData.username}:`, error);
+            }
+        }
+
+        this.render();
+        this.hideLoading();
+    }
+
+    getAllItems() {
+        const allItems = [];
+        for (const [entityId, playerData] of this.players) {
+            for (const item of playerData.items) {
+                allItems.push({
+                    ...item,
+                    playerName: playerData.username
+                });
+            }
+        }
+        return allItems;
+    }
+
+    getFilteredItems() {
+        let items = this.getAllItems();
+
+        // Filter by tier
+        const tierFilter = this.filterTierSelect.value;
+        if (tierFilter !== 'all') {
+            items = items.filter(i => i.tier === parseInt(tierFilter));
+        }
+
+        // Filter by rarity
+        const rarityFilter = this.filterRaritySelect.value;
+        if (rarityFilter !== 'all') {
+            items = items.filter(i => i.rarity === rarityFilter);
+        }
+
+        // Filter by search term
+        const search = this.itemSearchInput.value.toLowerCase().trim();
+        if (search) {
+            items = items.filter(i => i.name.toLowerCase().includes(search));
+        }
+
+        return items;
+    }
+
+    aggregateItems(items) {
+        // Aggregate same items (combine counts)
+        const aggregated = new Map();
+
+        for (const item of items) {
+            // Key by name + tier + rarity (and player if grouping by player)
+            const groupBy = this.groupBySelect.value;
+            const key = groupBy === 'player'
+                ? `${item.name}|${item.tier}|${item.rarity}|${item.playerName}`
+                : `${item.name}|${item.tier}|${item.rarity}`;
+
+            if (aggregated.has(key)) {
+                aggregated.get(key).count += item.count;
+            } else {
+                aggregated.set(key, { ...item });
+            }
+        }
+
+        return Array.from(aggregated.values());
     }
 
     render() {
-        const filtered = this.getFilteredInventory();
-
-        if (filtered.length === 0) {
-            this.inventoryList.innerHTML = `
-                <div class="empty-state">
-                    ${this.inventory.length === 0
-                        ? 'No items in inventory. Add some items above!'
-                        : 'No items match your search.'}
-                </div>
-            `;
-        } else {
-            // Sort alphabetically by name
-            filtered.sort((a, b) => a.name.localeCompare(b.name));
-
-            this.inventoryList.innerHTML = filtered.map(item => `
-                <div class="inventory-item" data-id="${item.id}">
-                    <span class="item-name">${this.escapeHtml(item.name)}</span>
-                    <span class="item-category">${item.category}</span>
-                    <div class="item-quantity">
-                        <button class="quantity-btn" onclick="tracker.updateQuantity(${item.id}, -1)">-</button>
-                        <span class="quantity-value">${item.quantity}</span>
-                        <button class="quantity-btn" onclick="tracker.updateQuantity(${item.id}, 1)">+</button>
-                    </div>
-                    <div class="item-actions">
-                        <button class="delete-btn" onclick="tracker.deleteItem(${item.id})">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
+        this.renderPlayerList();
+        this.renderInventory();
         this.updateStats();
     }
 
+    renderPlayerList() {
+        if (this.players.size === 0) {
+            this.playerList.innerHTML = '<p class="empty-state">No players added yet. Search for a player above.</p>';
+            return;
+        }
+
+        this.playerList.innerHTML = Array.from(this.players.entries()).map(([entityId, data]) => `
+            <div class="player-chip">
+                <span>${this.escapeHtml(data.username)}</span>
+                <span>(${data.items.length} items)</span>
+                <button class="remove-btn" onclick="viewer.removePlayer('${entityId}')">&times;</button>
+            </div>
+        `).join('');
+    }
+
+    renderInventory() {
+        if (this.players.size === 0) {
+            this.inventoryContent.innerHTML = '<p class="empty-state">Add a player to view their inventory.</p>';
+            return;
+        }
+
+        const items = this.getFilteredItems();
+        const aggregated = this.aggregateItems(items);
+
+        if (aggregated.length === 0) {
+            this.inventoryContent.innerHTML = '<p class="empty-state">No items match your filters.</p>';
+            return;
+        }
+
+        const groupBy = this.groupBySelect.value;
+
+        if (groupBy === 'none') {
+            this.renderItemTable(aggregated);
+        } else {
+            this.renderGroupedItems(aggregated, groupBy);
+        }
+    }
+
+    renderItemTable(items, showPlayer = true) {
+        // Sort by name
+        items.sort((a, b) => a.name.localeCompare(b.name));
+
+        const showPlayerColumn = showPlayer && this.players.size > 1 && this.groupBySelect.value !== 'player';
+
+        return `
+            <table class="inventory-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Tier</th>
+                        <th>Rarity</th>
+                        <th>Count</th>
+                        ${showPlayerColumn ? '<th>Player</th>' : ''}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(item => `
+                        <tr>
+                            <td class="item-name">${this.escapeHtml(item.name)}</td>
+                            <td><span class="tier-badge">T${item.tier}</span></td>
+                            <td class="rarity-${(item.rarity || 'common').toLowerCase()}">${item.rarity || 'Unknown'}</td>
+                            <td class="count-value">${item.count.toLocaleString()}</td>
+                            ${showPlayerColumn ? `<td><span class="player-tag">${this.escapeHtml(item.playerName)}</span></td>` : ''}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    renderGroupedItems(items, groupBy) {
+        const groups = new Map();
+
+        for (const item of items) {
+            let key;
+            if (groupBy === 'tier') {
+                key = `Tier ${item.tier}`;
+            } else if (groupBy === 'rarity') {
+                key = item.rarity;
+            } else if (groupBy === 'player') {
+                key = item.playerName;
+            }
+
+            if (!groups.has(key)) {
+                groups.set(key, []);
+            }
+            groups.get(key).push(item);
+        }
+
+        // Sort groups
+        const sortedGroups = Array.from(groups.entries());
+        if (groupBy === 'tier') {
+            sortedGroups.sort((a, b) => {
+                const tierA = parseInt(a[0].replace('Tier ', ''));
+                const tierB = parseInt(b[0].replace('Tier ', ''));
+                return tierB - tierA; // Highest tier first
+            });
+        } else if (groupBy === 'rarity') {
+            const rarityOrder = ['Mythic', 'Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'];
+            sortedGroups.sort((a, b) => rarityOrder.indexOf(a[0]) - rarityOrder.indexOf(b[0]));
+        } else {
+            sortedGroups.sort((a, b) => a[0].localeCompare(b[0]));
+        }
+
+        this.inventoryContent.innerHTML = sortedGroups.map(([groupName, groupItems]) => {
+            const totalCount = groupItems.reduce((sum, i) => sum + i.count, 0);
+            return `
+                <div class="inventory-group">
+                    <div class="group-header ${groupBy === 'rarity' ? 'rarity-' + groupName.toLowerCase() : ''}">
+                        <span>${groupName}</span>
+                        <span class="group-count">${groupItems.length} items (${totalCount.toLocaleString()} total)</span>
+                    </div>
+                    ${this.renderItemTable(groupItems, groupBy !== 'player')}
+                </div>
+            `;
+        }).join('');
+    }
+
     updateStats() {
-        this.totalItemsEl.textContent = this.inventory.length;
-        this.totalQuantityEl.textContent = this.inventory.reduce((sum, item) => sum + item.quantity, 0);
+        this.statPlayers.textContent = this.players.size;
+
+        const items = this.getFilteredItems();
+        const aggregated = this.aggregateItems(items);
+
+        this.statUnique.textContent = aggregated.length;
+        this.statTotal.textContent = items.reduce((sum, i) => sum + i.count, 0).toLocaleString();
+    }
+
+    exportCSV() {
+        const items = this.getFilteredItems();
+        const aggregated = this.aggregateItems(items);
+
+        if (aggregated.length === 0) {
+            alert('No items to export.');
+            return;
+        }
+
+        // Sort by name
+        aggregated.sort((a, b) => a.name.localeCompare(b.name));
+
+        const headers = ['Name', 'Tier', 'Rarity', 'Count'];
+        if (this.players.size > 1) {
+            headers.push('Player');
+        }
+
+        const rows = aggregated.map(item => {
+            const row = [
+                `"${item.name}"`,
+                item.tier,
+                item.rarity,
+                item.count
+            ];
+            if (this.players.size > 1) {
+                row.push(`"${item.playerName}"`);
+            }
+            return row.join(',');
+        });
+
+        const csv = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bitcraft-inventory-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    clearAll() {
+        if (this.players.size === 0) return;
+        if (confirm('Remove all players and clear inventory data?')) {
+            this.players.clear();
+            this.render();
+        }
     }
 
     escapeHtml(text) {
@@ -154,65 +739,7 @@ class InventoryTracker {
         div.textContent = text;
         return div.innerHTML;
     }
-
-    exportData() {
-        const data = JSON.stringify(this.inventory, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bitcraft-inventory-${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    importData(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (Array.isArray(data)) {
-                    // Merge with existing inventory
-                    data.forEach(item => {
-                        if (item.name && item.quantity && item.category) {
-                            const existingIndex = this.inventory.findIndex(
-                                i => i.name.toLowerCase() === item.name.toLowerCase() && i.category === item.category
-                            );
-                            if (existingIndex !== -1) {
-                                this.inventory[existingIndex].quantity += item.quantity;
-                            } else {
-                                this.inventory.push({
-                                    id: Date.now() + Math.random(),
-                                    name: item.name,
-                                    quantity: item.quantity,
-                                    category: item.category
-                                });
-                            }
-                        }
-                    });
-                    this.saveInventory();
-                    this.render();
-                    alert('Inventory imported successfully!');
-                }
-            } catch (err) {
-                alert('Error importing file. Please make sure it\'s a valid JSON file.');
-            }
-        };
-        reader.readAsText(file);
-        event.target.value = '';
-    }
-
-    clearAll() {
-        if (confirm('Are you sure you want to clear all inventory? This cannot be undone.')) {
-            this.inventory = [];
-            this.saveInventory();
-            this.render();
-        }
-    }
 }
 
-// Initialize the tracker
-const tracker = new InventoryTracker();
+// Initialize
+const viewer = new InventoryViewer();

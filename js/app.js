@@ -127,8 +127,8 @@ class InventoryViewer {
     decodeSvelteKitData(json) {
         if (!json || !json.nodes) return null;
 
-        // Find the data node
-        const dataNode = json.nodes.find(n => n.type === 'data' && n.data);
+        // Find the data node (skip null entries)
+        const dataNode = json.nodes.find(n => n && n.type === 'data' && n.data);
         if (!dataNode) return null;
 
         const data = dataNode.data;

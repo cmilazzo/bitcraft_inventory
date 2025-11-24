@@ -893,7 +893,7 @@ class InventoryViewer {
     }
 
     aggregateItems(items) {
-        // Aggregate same items (combine counts)
+        // Aggregate same items (combine counts) and track contributing players
         const aggregated = new Map();
 
         for (const item of items) {
@@ -904,9 +904,19 @@ class InventoryViewer {
                 : `${item.name}|${item.tier}|${item.rarity}`;
 
             if (aggregated.has(key)) {
-                aggregated.get(key).count += item.count;
+                const existing = aggregated.get(key);
+                existing.count += item.count;
+                // Track all contributing players
+                if (item.playerName) {
+                    existing.players.add(item.playerName);
+                }
             } else {
-                aggregated.set(key, { ...item });
+                // Initialize with a Set of contributing players
+                const newItem = { ...item, players: new Set() };
+                if (item.playerName) {
+                    newItem.players.add(item.playerName);
+                }
+                aggregated.set(key, newItem);
             }
         }
 
@@ -1038,7 +1048,7 @@ class InventoryViewer {
                             <td><span class="tier-badge">T${item.tier}</span></td>
                             <td class="rarity-${(item.rarity || 'common').toLowerCase()}">${item.rarity || 'Unknown'}</td>
                             <td class="count-value">${item.count.toLocaleString()}</td>
-                            ${showPlayerColumn ? `<td><span class="player-tag">${this.escapeHtml(item.playerName)}</span></td>` : ''}
+                            ${showPlayerColumn ? `<td class="player-tags">${this.renderPlayerTags(item.players)}</td>` : ''}
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1167,6 +1177,20 @@ class InventoryViewer {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Render player tags for items with multiple contributors
+    renderPlayerTags(players) {
+        if (!players || players.size === 0) {
+            return '';
+        }
+
+        // Convert Set to sorted array
+        const playerList = Array.from(players).sort();
+
+        return playerList.map(player =>
+            `<span class="player-tag">${this.escapeHtml(player)}</span>`
+        ).join('');
     }
 }
 

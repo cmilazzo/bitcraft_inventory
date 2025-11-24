@@ -358,15 +358,41 @@ class InventoryViewer {
             // Derive tier from item name since the tier field is unreliable
             const tier = this.deriveTierFromName(name);
 
+            // Get base item name by stripping tier prefix
+            const baseItem = this.getBaseItemName(name);
+
+            // Get tag/type from item details
+            const tag = itemDetails.tag || 'Other';
+
             items.push({
                 name: name,
                 tier: tier,
                 rarity: this.normalizeRarity(rarity),
                 count: quantity,
                 playerId,
-                location
+                location,
+                baseItem,
+                tag
             });
         }
+    }
+
+    // Strip tier prefix from item name to get base item
+    getBaseItemName(name) {
+        const tierPrefixes = [
+            'Rough', 'Primitive', 'Basic', 'Simple', 'Improved', 'Sturdy',
+            'Quality', 'Infused', 'Fine', 'Essential', 'Superior', 'Exquisite',
+            'Succulent', 'Peerless', 'Ornate', 'Ambrosial', 'Flavorful',
+            'Aurumite', 'Pristine', 'Celestium', 'Luminite', 'Rathium',
+            'Zesty', 'Plain', 'Novice'
+        ];
+
+        for (const prefix of tierPrefixes) {
+            if (name.startsWith(prefix + ' ')) {
+                return name.substring(prefix.length + 1);
+            }
+        }
+        return name;
     }
 
     deriveTierFromName(name) {
@@ -709,8 +735,13 @@ class InventoryViewer {
     }
 
     renderItemTable(items, showPlayer = true) {
-        // Sort by name
-        items.sort((a, b) => a.name.localeCompare(b.name));
+        // Sort by tier (ascending) then name when grouped by baseItem, otherwise by name
+        const groupBy = this.groupBySelect.value;
+        if (groupBy === 'baseItem') {
+            items.sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+        } else {
+            items.sort((a, b) => a.name.localeCompare(b.name));
+        }
 
         const showPlayerColumn = showPlayer && this.players.size > 1 && this.groupBySelect.value !== 'player';
 
@@ -751,6 +782,10 @@ class InventoryViewer {
                 key = item.rarity;
             } else if (groupBy === 'player') {
                 key = item.playerName;
+            } else if (groupBy === 'baseItem') {
+                key = item.baseItem || item.name;
+            } else if (groupBy === 'tag') {
+                key = item.tag || 'Other';
             }
 
             if (!groups.has(key)) {
@@ -770,6 +805,12 @@ class InventoryViewer {
         } else if (groupBy === 'rarity') {
             const rarityOrder = ['Mythic', 'Legendary', 'Epic', 'Rare', 'Uncommon', 'Common'];
             sortedGroups.sort((a, b) => rarityOrder.indexOf(a[0]) - rarityOrder.indexOf(b[0]));
+        } else if (groupBy === 'baseItem') {
+            // Sort by base item name alphabetically
+            sortedGroups.sort((a, b) => a[0].localeCompare(b[0]));
+        } else if (groupBy === 'tag') {
+            // Sort by tag name alphabetically
+            sortedGroups.sort((a, b) => a[0].localeCompare(b[0]));
         } else {
             sortedGroups.sort((a, b) => a[0].localeCompare(b[0]));
         }

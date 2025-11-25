@@ -1171,18 +1171,38 @@ class InventoryViewer {
             sortedGroups.sort((a, b) => a[0].localeCompare(b[0]));
         }
 
-        this.inventoryContent.innerHTML = sortedGroups.map(([groupName, groupItems]) => {
+        this.inventoryContent.innerHTML = sortedGroups.map(([groupName, groupItems], index) => {
             const totalCount = groupItems.reduce((sum, i) => sum + i.count, 0);
+            const groupId = `group-${groupBy}-${index}`;
             return `
-                <div class="inventory-group">
-                    <div class="group-header ${groupBy === 'rarity' ? 'rarity-' + groupName.toLowerCase() : ''}">
-                        <span>${groupName}</span>
+                <div class="inventory-group" data-group-id="${groupId}">
+                    <div class="group-header ${groupBy === 'rarity' ? 'rarity-' + groupName.toLowerCase() : ''}" onclick="viewer.toggleGroup('${groupId}')">
+                        <div class="group-header-content">
+                            <span class="group-chevron">▼</span>
+                            <span class="group-name">${this.escapeHtml(groupName)}</span>
+                        </div>
                         <span class="group-count">${groupItems.length} items (${totalCount.toLocaleString()} total)</span>
                     </div>
-                    ${this.renderItemTable(groupItems, groupBy !== 'player')}
+                    <div class="group-content" id="${groupId}">
+                        ${this.renderItemTable(groupItems, groupBy !== 'player')}
+                    </div>
                 </div>
             `;
         }).join('');
+    }
+
+    toggleGroup(groupId) {
+        const groupContent = document.getElementById(groupId);
+        const groupElement = document.querySelector(`[data-group-id="${groupId}"]`);
+        const chevron = groupElement.querySelector('.group-chevron');
+
+        if (groupContent.classList.contains('collapsed')) {
+            groupContent.classList.remove('collapsed');
+            chevron.style.transform = 'rotate(0deg)';
+        } else {
+            groupContent.classList.add('collapsed');
+            chevron.style.transform = 'rotate(-90deg)';
+        }
     }
 
     updateStats() {

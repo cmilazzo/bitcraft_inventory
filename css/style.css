@@ -500,13 +500,50 @@ section h2 {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Rarity colors - text only */
-.rarity-common { color: var(--rarity-common); }
-.rarity-uncommon { color: var(--rarity-uncommon); }
-.rarity-rare { color: var(--rarity-rare); }
-.rarity-epic { color: var(--rarity-epic); }
-.rarity-legendary { color: var(--rarity-legendary); }
-.rarity-mythic { color: var(--rarity-mythic); }
+/* Rarity badge styling - colored pill badges */
+.inventory-table td .rarity-common,
+.inventory-table td .rarity-uncommon,
+.inventory-table td .rarity-rare,
+.inventory-table td .rarity-epic,
+.inventory-table td .rarity-legendary,
+.inventory-table td .rarity-mythic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    color: white;
+}
+
+.inventory-table td .rarity-common {
+    background: var(--rarity-common);
+    color: var(--bg-primary);
+}
+
+.inventory-table td .rarity-uncommon {
+    background: var(--rarity-uncommon);
+}
+
+.inventory-table td .rarity-rare {
+    background: var(--rarity-rare);
+}
+
+.inventory-table td .rarity-epic {
+    background: var(--rarity-epic);
+}
+
+.inventory-table td .rarity-legendary {
+    background: var(--rarity-legendary);
+}
+
+.inventory-table td .rarity-mythic {
+    background: var(--rarity-mythic);
+    color: var(--bg-primary);
+}
 
 /* Rarity styling for table rows */
 .inventory-table tbody tr {

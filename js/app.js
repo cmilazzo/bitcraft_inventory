@@ -1117,7 +1117,7 @@ class InventoryViewer {
                         <tr class="rarity-row-${(item.rarity || 'common').toLowerCase()}">
                             <td class="item-name">${this.escapeHtml(item.name)}</td>
                             <td><span class="tier-badge">T${item.tier}</span></td>
-                            <td class="rarity-${(item.rarity || 'common').toLowerCase()}">${item.rarity || 'Unknown'}</td>
+                            <td><span class="rarity-${(item.rarity || 'common').toLowerCase()}">${item.rarity || 'Unknown'}</span></td>
                             <td class="count-value">${item.count.toLocaleString()}</td>
                             ${showPlayerColumn ? `<td class="player-tags">${this.renderPlayerTags(item.players)}</td>` : ''}
                         </tr>

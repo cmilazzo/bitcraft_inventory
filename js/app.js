@@ -1,7 +1,7 @@
 // Bitcraft Inventory Viewer
 // Fetches data from bitjita.com API and displays aggregated inventory
 
-const API_BASE = 'https://young-base-bcd2.chris-milazzo.workers.dev/proxy';
+const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 
 // Package contents mapping: base item suffix -> quantity per package
 // Package names follow pattern: "[Tier Prefix] [Base Item] Package"

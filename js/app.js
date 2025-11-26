@@ -964,7 +964,7 @@ class InventoryViewer {
     }
 
     aggregateItems(items) {
-        // Aggregate same items (combine counts) and track contributing players
+        // Aggregate same items (combine counts) and track contributing players with quantities
         const aggregated = new Map();
 
         for (const item of items) {
@@ -977,15 +977,16 @@ class InventoryViewer {
             if (aggregated.has(key)) {
                 const existing = aggregated.get(key);
                 existing.count += item.count;
-                // Track all contributing players
+                // Track all contributing players with their quantities
                 if (item.playerName) {
-                    existing.players.add(item.playerName);
+                    const currentQty = existing.playerQuantities.get(item.playerName) || 0;
+                    existing.playerQuantities.set(item.playerName, currentQty + item.count);
                 }
             } else {
-                // Initialize with a Set of contributing players
-                const newItem = { ...item, players: new Set() };
+                // Initialize with a Map of contributing players and their quantities
+                const newItem = { ...item, playerQuantities: new Map() };
                 if (item.playerName) {
-                    newItem.players.add(item.playerName);
+                    newItem.playerQuantities.set(item.playerName, item.count);
                 }
                 aggregated.set(key, newItem);
             }
@@ -1119,7 +1120,7 @@ class InventoryViewer {
                             <td><span class="tier-badge">T${item.tier}</span></td>
                             <td><span class="rarity-${(item.rarity || 'common').toLowerCase()}">${item.rarity || 'Unknown'}</span></td>
                             <td class="count-value">${item.count.toLocaleString()}</td>
-                            ${showPlayerColumn ? `<td class="player-tags">${this.renderPlayerTags(item.players)}</td>` : ''}
+                            ${showPlayerColumn ? `<td class="player-tags">${this.renderPlayerTags(item.playerQuantities)}</td>` : ''}
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1271,16 +1272,22 @@ class InventoryViewer {
     }
 
     // Render player tags for items with multiple contributors
-    renderPlayerTags(players) {
-        if (!players || players.size === 0) {
+    renderPlayerTags(playerQuantities) {
+        if (!playerQuantities || playerQuantities.size === 0) {
             return '';
         }
 
-        // Convert Set to sorted array
-        const playerList = Array.from(players).sort();
+        // Convert Map to sorted array of [player, quantity] entries
+        const playerList = Array.from(playerQuantities.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]));
 
-        return playerList.map(player =>
-            `<span class="player-tag">${this.escapeHtml(player)}</span>`
+        // Show quantity in parentheses only if there are 2 or more players
+        const showQuantities = playerQuantities.size >= 2;
+
+        return playerList.map(([player, quantity]) =>
+            showQuantities
+                ? `<span class="player-tag">${this.escapeHtml(player)} (${quantity.toLocaleString()})</span>`
+                : `<span class="player-tag">${this.escapeHtml(player)}</span>`
         ).join('');
     }
 }

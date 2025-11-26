@@ -547,37 +547,52 @@ section h2 {
 
 /* Rarity styling for table rows */
 .inventory-table tbody tr {
-    border-left: 3px solid transparent;
     transition: all 0.15s;
 }
 
-.inventory-table tbody tr.rarity-row-common {
-    border-left-color: var(--rarity-common);
+/* Apply colored border to first cell of each row */
+.inventory-table tbody tr.rarity-row-common td:first-child {
+    border-left: 3px solid var(--rarity-common);
 }
 
 .inventory-table tbody tr.rarity-row-uncommon {
-    border-left-color: var(--rarity-uncommon);
     background: rgba(34, 197, 94, 0.03);
 }
 
+.inventory-table tbody tr.rarity-row-uncommon td:first-child {
+    border-left: 3px solid var(--rarity-uncommon);
+}
+
 .inventory-table tbody tr.rarity-row-rare {
-    border-left-color: var(--rarity-rare);
     background: rgba(59, 130, 246, 0.03);
 }
 
+.inventory-table tbody tr.rarity-row-rare td:first-child {
+    border-left: 3px solid var(--rarity-rare);
+}
+
 .inventory-table tbody tr.rarity-row-epic {
-    border-left-color: var(--rarity-epic);
     background: rgba(168, 85, 247, 0.03);
 }
 
+.inventory-table tbody tr.rarity-row-epic td:first-child {
+    border-left: 3px solid var(--rarity-epic);
+}
+
 .inventory-table tbody tr.rarity-row-legendary {
-    border-left-color: var(--rarity-legendary);
     background: rgba(249, 115, 22, 0.03);
 }
 
+.inventory-table tbody tr.rarity-row-legendary td:first-child {
+    border-left: 3px solid var(--rarity-legendary);
+}
+
 .inventory-table tbody tr.rarity-row-mythic {
-    border-left-color: var(--rarity-mythic);
     background: rgba(234, 179, 8, 0.03);
+}
+
+.inventory-table tbody tr.rarity-row-mythic td:first-child {
+    border-left: 3px solid var(--rarity-mythic);
 }
 
 .inventory-table tbody tr:hover {

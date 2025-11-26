@@ -462,7 +462,8 @@ section h2 {
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-subtle);
     font-size: 0.8125rem;
-    vertical-align: middle;
+    vertical-align: top;
+    line-height: 1.6;
 }
 
 .inventory-table tbody tr:last-child td {
@@ -609,7 +610,8 @@ section h2 {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-    align-items: center;
+    align-items: flex-start;
+    line-height: 1.6;
 }
 
 .player-tag {

@@ -440,8 +440,7 @@ section h2 {
 /* Inventory Table */
 .inventory-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
 }
 
 .inventory-table th {

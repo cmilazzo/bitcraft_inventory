@@ -1391,12 +1391,13 @@ class MarketViewer {
     }
 
     getFilteredItems() {
-        let filtered = [...this.items];
+        // Require at least one tag to be selected
+        if (this.selectedTags.size === 0) {
+            return [];
+        }
 
         // Filter by selected tags (multi-select)
-        if (this.selectedTags.size > 0) {
-            filtered = filtered.filter(item => this.selectedTags.has(item.tag));
-        }
+        let filtered = this.items.filter(item => this.selectedTags.has(item.tag));
 
         // Filter by rarity
         if (this.selectedRarity !== 'all') {
@@ -1694,7 +1695,10 @@ function renderMarketTable() {
     document.getElementById('market-stat-available').textContent = totalAvailable.toLocaleString();
 
     if (items.length === 0) {
-        content.innerHTML = '<p class="empty-state">No items match your filters.</p>';
+        const message = marketViewer.selectedTags.size === 0
+            ? 'Please select at least one tag/type to view market items.'
+            : 'No items match your filters.';
+        content.innerHTML = `<p class="empty-state">${message}</p>`;
         return;
     }
 

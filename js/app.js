@@ -1390,77 +1390,38 @@ class MarketViewer {
 
     async fetchItemPrice(itemId) {
         try {
-            // Try the item detail page endpoint
-            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json`);
+            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json?hasSellOrders=true&hasOrders=true`);
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
-            console.log(`\n=== Fetching price for item ${itemId} ===`);
-
-            // The decoded data might have orders in various places
-            let sellOrders = null;
-
-            // Check all possible paths in the decoded structure
-            if (decoded) {
-                // Try direct properties
-                if (decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
-                    sellOrders = decoded.sellOrders;
-                    console.log('Found sellOrders at root level');
-                }
-                // Try nested in item object
-                else if (decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
-                    sellOrders = decoded.item.sellOrders;
-                    console.log('Found sellOrders in item object');
-                }
-                // Try nested in marketData
-                else if (decoded.marketData) {
-                    // Check if the specific item has orders
-                    if (decoded.marketData.sellOrders && Array.isArray(decoded.marketData.sellOrders)) {
-                        sellOrders = decoded.marketData.sellOrders;
-                        console.log('Found sellOrders in marketData');
-                    }
-                    // Maybe orders are attached to items
-                    else if (decoded.marketData.items && Array.isArray(decoded.marketData.items)) {
-                        // Find the specific item in the items array
-                        const item = decoded.marketData.items.find(i => i.id === String(itemId));
-                        if (item && item.orders && Array.isArray(item.orders)) {
-                            sellOrders = item.orders.filter(order => order.type === 'sell' || order.orderType === 'sell');
-                            console.log('Found orders array in specific item');
-                        }
-                    }
-                }
-                // Try orders object
-                else if (decoded.orders) {
-                    if (Array.isArray(decoded.orders.sell)) {
-                        sellOrders = decoded.orders.sell;
-                        console.log('Found sellOrders in orders.sell');
-                    } else if (Array.isArray(decoded.orders.sellOrders)) {
-                        sellOrders = decoded.orders.sellOrders;
-                        console.log('Found sellOrders in orders.sellOrders');
-                    } else if (Array.isArray(decoded.orders)) {
-                        sellOrders = decoded.orders.filter(order => order.type === 'sell' || order.orderType === 'sell');
-                        console.log('Found orders array, filtered for sell orders');
-                    }
-                }
+            if (!decoded) {
+                return null;
             }
 
-            if (sellOrders && sellOrders.length > 0) {
-                console.log(`Found ${sellOrders.length} sell orders for item ${itemId}`);
-                console.log('First sell order structure:', sellOrders[0]);
+            // The decoded structure should have sellOrders directly
+            let sellOrders = decoded.sellOrders;
 
-                // Try different possible property names for price
+            // If not found directly, try nested paths
+            if (!sellOrders && decoded.marketItem) {
+                sellOrders = decoded.marketItem.sellOrders;
+            }
+
+            if (!sellOrders && decoded.item) {
+                sellOrders = decoded.item.sellOrders;
+            }
+
+            if (sellOrders && Array.isArray(sellOrders) && sellOrders.length > 0) {
+                // Extract prices from priceThreshold property
                 const prices = sellOrders
-                    .map(order => order.priceThreshold || order.price || order.pricePerUnit || order.unitPrice || order.pricePerItem)
+                    .map(order => order.priceThreshold)
                     .filter(price => price != null && price > 0);
 
                 if (prices.length > 0) {
                     const lowestPrice = Math.min(...prices);
-                    console.log(`Lowest price for item ${itemId}: ${lowestPrice}`);
                     return lowestPrice;
                 }
             }
 
-            console.log(`No sell orders found for item ${itemId}`);
             return null;
         } catch (error) {
             console.error(`Error fetching price for item ${itemId}:`, error);
@@ -1469,15 +1430,22 @@ class MarketViewer {
     }
 
     async loadPricesForVisibleItems(items) {
-        // Price data is not available through the public API
-        // The individual item endpoints don't return actual sell order details
-        // Just mark all items as loaded with null price
-        items.forEach(item => {
-            if (!item.priceLoaded) {
-                item.price = null;
+        // Only fetch prices for items that don't have them yet
+        const itemsNeedingPrices = items.filter(item => !item.priceLoaded && item.sellOrders > 0);
+
+        if (itemsNeedingPrices.length === 0) {
+            return;
+        }
+
+        // Fetch prices in batches to avoid overwhelming the API
+        const batchSize = 10;
+        for (let i = 0; i < itemsNeedingPrices.length; i += batchSize) {
+            const batch = itemsNeedingPrices.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (item) => {
+                item.price = await this.fetchItemPrice(item.id);
                 item.priceLoaded = true;
-            }
-        });
+            }));
+        }
     }
 
     getAvailableTags() {
@@ -1748,6 +1716,7 @@ async function renderMarketView() {
                                 <option value="name">Name</option>
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
+                                <option value="price">Price</option>
                                 <option value="quantity">Quantity</option>
                             </select>
                         </div>
@@ -1860,7 +1829,7 @@ async function renderMarketTable() {
         return;
     }
 
-    // Render table (prices not available via public API)
+    // Render initial table with loading state for prices
     content.innerHTML = `
         <table class="inventory-table">
             <thead>
@@ -1869,6 +1838,7 @@ async function renderMarketTable() {
                     <th>Tier</th>
                     <th>Rarity</th>
                     <th>Tag/Type</th>
+                    <th>Price</th>
                     <th>Available</th>
                 </tr>
             </thead>
@@ -1883,12 +1853,30 @@ async function renderMarketTable() {
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
+                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
             </tbody>
         </table>
     `;
+
+    // Load prices asynchronously
+    await marketViewer.loadPricesForVisibleItems(items);
+
+    // Update the table with loaded prices
+    const tbody = document.getElementById('market-table-body');
+    if (tbody) {
+        items.forEach(item => {
+            const row = tbody.querySelector(`tr[data-item-id="${item.id}"]`);
+            if (row) {
+                const priceCell = row.querySelector('.price-value');
+                if (priceCell) {
+                    priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
+                }
+            }
+        });
+    }
 }
 
 function escapeHtml(text) {

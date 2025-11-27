@@ -1596,6 +1596,26 @@ let originalInventoryHTML = null;
 async function renderMarketView() {
     const main = document.querySelector('main');
 
+    // Check if market view is already rendered
+    const existingMarketControls = document.querySelector('.market-controls');
+    const existingMarketContent = document.getElementById('market-content');
+
+    if (existingMarketControls && existingMarketContent) {
+        // Market view already exists, just ensure tags are populated and refresh the data
+        const tags = marketViewer.getAvailableTags();
+        const tagContainer = document.getElementById('tag-filter-container');
+
+        // Re-render tags if container is empty
+        if (tagContainer && tagContainer.children.length === 0) {
+            renderTagFilters(tags);
+            setupMarketEventListeners();
+        }
+
+        renderMarketTable();
+        document.getElementById('loading-overlay').classList.add('hidden');
+        return;
+    }
+
     // Store the original inventory sections before replacing them (only once)
     if (!originalInventoryHTML) {
         const statsBar = document.querySelector('.stats-bar');
@@ -1626,7 +1646,7 @@ async function renderMarketView() {
         const statsBar = document.querySelector('.stats-bar');
         const inventoryDisplay = document.querySelector('.inventory-display');
 
-        if (statsBar) {
+        if (statsBar && !statsBar.querySelector('#market-stat-total')) {
             statsBar.outerHTML = `
                 <section class="stats-bar">
                     <div class="stat">
@@ -1645,7 +1665,7 @@ async function renderMarketView() {
             `;
         }
 
-        if (inventoryDisplay) {
+        if (inventoryDisplay && !document.querySelector('.market-controls')) {
             inventoryDisplay.outerHTML = `
                 <section class="market-controls">
                     <h2>Market Filters</h2>
@@ -1716,6 +1736,10 @@ async function renderMarketView() {
 
 function renderTagFilters(tags) {
     const container = document.getElementById('tag-filter-container');
+    if (!container) {
+        console.error('Tag filter container not found');
+        return;
+    }
     container.innerHTML = tags.map(tag => `
         <label class="tag-filter-item">
             <input type="checkbox" value="${tag}" class="tag-checkbox">

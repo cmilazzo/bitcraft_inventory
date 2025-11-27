@@ -1390,33 +1390,60 @@ class MarketViewer {
 
     async fetchItemPrice(itemId) {
         try {
-            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json?hasSellOrders=true&hasOrders=true`);
+            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json?hasOrders=true&hasSellOrders=true&x-sveltekit-invalidated=001`);
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
-            console.log(`[Item ${itemId}] Fetching price...`);
+            console.log(`[Item ${itemId}] Decoded structure:`, decoded);
+            console.log(`[Item ${itemId}] Decoded keys:`, decoded ? Object.keys(decoded) : 'null');
 
-            if (!decoded || !decoded.marketData || !decoded.marketData.items) {
-                console.log(`[Item ${itemId}] Invalid data structure`);
+            if (!decoded) {
+                console.log(`[Item ${itemId}] No decoded data`);
                 return null;
             }
 
-            // The API returns the full market list instead of just this item
-            // We need to find the specific item in the items array
-            const item = decoded.marketData.items.find(i => i.id === itemId);
+            // Try different possible locations for sellOrders
+            let sellOrders = null;
 
-            if (!item) {
-                console.log(`[Item ${itemId}] Item not found in items array`);
+            // Check if sellOrders is directly accessible
+            if (decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
+                sellOrders = decoded.sellOrders;
+                console.log(`[Item ${itemId}] Found sellOrders directly`);
+            }
+            // Check if it's nested in item
+            else if (decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
+                sellOrders = decoded.item.sellOrders;
+                console.log(`[Item ${itemId}] Found sellOrders in item`);
+            }
+            // Check if it's in marketItem
+            else if (decoded.marketItem && decoded.marketItem.sellOrders && Array.isArray(decoded.marketItem.sellOrders)) {
+                sellOrders = decoded.marketItem.sellOrders;
+                console.log(`[Item ${itemId}] Found sellOrders in marketItem`);
+            }
+            // It might be in marketData for this endpoint
+            else if (decoded.marketData) {
+                console.log(`[Item ${itemId}] Checking marketData...`);
+                // Check if the individual item endpoint uses the same structure as market list
+                if (decoded.marketData.items) {
+                    const item = decoded.marketData.items.find(i => i.id === itemId);
+                    if (item && item.sellOrders && Array.isArray(item.sellOrders)) {
+                        sellOrders = item.sellOrders;
+                        console.log(`[Item ${itemId}] Found sellOrders in marketData.items`);
+                    }
+                } else if (decoded.marketData.sellOrders && Array.isArray(decoded.marketData.sellOrders)) {
+                    sellOrders = decoded.marketData.sellOrders;
+                    console.log(`[Item ${itemId}] Found sellOrders in marketData`);
+                }
+            }
+
+            if (!sellOrders) {
+                console.log(`[Item ${itemId}] Could not find sellOrders array`);
                 return null;
             }
 
-            console.log(`[Item ${itemId}] Found item:`, item);
-
-            // Check if the item has sell orders (could be array or object)
-            let sellOrders = item.sellOrders;
-
-            if (sellOrders && Array.isArray(sellOrders) && sellOrders.length > 0) {
+            if (sellOrders.length > 0) {
                 console.log(`[Item ${itemId}] Found ${sellOrders.length} sell orders`);
+                console.log(`[Item ${itemId}] First order:`, sellOrders[0]);
 
                 // Extract prices from priceThreshold property
                 const prices = sellOrders
@@ -1430,8 +1457,6 @@ class MarketViewer {
                     console.log(`[Item ${itemId}] Lowest price: ${lowestPrice}`);
                     return lowestPrice;
                 }
-            } else {
-                console.log(`[Item ${itemId}] sellOrders:`, sellOrders, `(type: ${typeof sellOrders})`);
             }
 
             return null;

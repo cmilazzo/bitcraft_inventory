@@ -3,6 +3,9 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 
+// Current view state
+let currentView = 'inventory';
+
 // Package contents mapping: base item suffix -> quantity per package
 // Package names follow pattern: "[Tier Prefix] [Base Item] Package"
 // e.g., "Simple Clay Lump Package" contains 500 "Simple Clay Lump"
@@ -1292,5 +1295,362 @@ class InventoryViewer {
     }
 }
 
+// Market Viewer Class
+class MarketViewer {
+    constructor() {
+        this.items = [];
+        this.selectedTags = new Set();
+        this.selectedRarity = 'all';
+        this.sortBy = 'name';
+        this.sortOrder = 'asc';
+        this.searchTerm = '';
+    }
+
+    async fetchMarketData() {
+        try {
+            const response = await fetch(`${API_BASE}/market/__data.json?hasOrders=true&hasSellOrders=true`);
+            const text = await response.text();
+            const data = devalue.parse(text);
+
+            // Extract items from the devalue data structure
+            this.items = this.extractMarketItems(data);
+            return this.items;
+        } catch (error) {
+            console.error('Error fetching market data:', error);
+            throw error;
+        }
+    }
+
+    extractMarketItems(data) {
+        // Market data uses same devalue format as player inventory
+        // Navigate through the nested structure to find items array
+        const items = [];
+
+        if (data && data.nodes && Array.isArray(data.nodes)) {
+            for (const node of data.nodes) {
+                if (node && node.data && Array.isArray(node.data)) {
+                    // Look for the items array in the data structure
+                    for (const item of node.data) {
+                        if (item && typeof item === 'object' && item.name) {
+                            items.push({
+                                id: item.id || '',
+                                name: item.name || 'Unknown',
+                                tier: item.tier ?? 0,
+                                rarity: item.rarityStr || item.rarity || 'Common',
+                                tag: item.tag || 'Unknown',
+                                hasSellOrders: item.hasSellOrders || false,
+                                hasBuyOrders: item.hasBuyOrders || false,
+                                sellOrders: item.sellOrders || 0,
+                                buyOrders: item.buyOrders || 0,
+                                totalOrders: item.totalOrders || 0,
+                                volume: item.volume || 0,
+                                description: item.description || ''
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        return items;
+    }
+
+    getAvailableTags() {
+        const tags = new Set();
+        this.items.forEach(item => {
+            if (item.tag && item.tag !== 'Unknown') {
+                tags.add(item.tag);
+            }
+        });
+        return Array.from(tags).sort();
+    }
+
+    getFilteredItems() {
+        let filtered = [...this.items];
+
+        // Filter by selected tags (multi-select)
+        if (this.selectedTags.size > 0) {
+            filtered = filtered.filter(item => this.selectedTags.has(item.tag));
+        }
+
+        // Filter by rarity
+        if (this.selectedRarity !== 'all') {
+            filtered = filtered.filter(item => item.rarity === this.selectedRarity);
+        }
+
+        // Filter by search term
+        if (this.searchTerm) {
+            const search = this.searchTerm.toLowerCase();
+            filtered = filtered.filter(item => item.name.toLowerCase().includes(search));
+        }
+
+        // Sort items
+        filtered.sort((a, b) => {
+            let comparison = 0;
+
+            if (this.sortBy === 'name') {
+                comparison = a.name.localeCompare(b.name);
+            } else if (this.sortBy === 'tier') {
+                comparison = a.tier - b.tier;
+            } else if (this.sortBy === 'rarity') {
+                const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
+                comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
+            } else if (this.sortBy === 'sellOrders') {
+                comparison = a.sellOrders - b.sellOrders;
+            } else if (this.sortBy === 'buyOrders') {
+                comparison = a.buyOrders - b.buyOrders;
+            }
+
+            return this.sortOrder === 'desc' ? -comparison : comparison;
+        });
+
+        return filtered;
+    }
+}
+
 // Initialize
 const viewer = new InventoryViewer();
+const marketViewer = new MarketViewer();
+
+// View Navigation Setup
+function setupNavigation() {
+    const navTabs = document.querySelectorAll('.nav-tab');
+
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const view = tab.dataset.view;
+            switchView(view);
+        });
+    });
+
+    // Load view from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
+    if (viewParam && (viewParam === 'inventory' || viewParam === 'market')) {
+        switchView(viewParam);
+    }
+}
+
+async function switchView(view) {
+    currentView = view;
+
+    // Update active tab
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.view === view);
+    });
+
+    // Update URL without reload
+    const url = new URL(window.location);
+    url.searchParams.set('view', view);
+    window.history.pushState({}, '', url);
+
+    // Show/hide appropriate sections
+    const inventorySections = document.querySelectorAll('.player-search, .active-players, .view-controls');
+    const main = document.querySelector('main');
+
+    if (view === 'inventory') {
+        inventorySections.forEach(section => section.style.display = '');
+        // Existing inventory functionality
+    } else if (view === 'market') {
+        inventorySections.forEach(section => section.style.display = 'none');
+        await renderMarketView();
+    }
+}
+
+async function renderMarketView() {
+    const main = document.querySelector('main');
+
+    // Show loading
+    document.getElementById('loading-overlay').classList.remove('hidden');
+
+    try {
+        // Fetch market data if not already loaded
+        if (marketViewer.items.length === 0) {
+            await marketViewer.fetchMarketData();
+        }
+
+        const tags = marketViewer.getAvailableTags();
+
+        // Build market view HTML
+        main.innerHTML = `
+            <section class="market-filters">
+                <h2>Market Filters</h2>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <label>Tags/Types (Multi-select):</label>
+                        <div id="tag-filter-container" class="tag-filter-container"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>Rarity:</label>
+                        <select id="market-rarity-filter">
+                            <option value="all">All Rarities</option>
+                            <option value="Common">Common</option>
+                            <option value="Uncommon">Uncommon</option>
+                            <option value="Rare">Rare</option>
+                            <option value="Epic">Epic</option>
+                            <option value="Legendary">Legendary</option>
+                            <option value="Mythic">Mythic</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Sort By:</label>
+                        <select id="market-sort-by">
+                            <option value="name">Name</option>
+                            <option value="tier">Tier</option>
+                            <option value="rarity">Rarity</option>
+                            <option value="sellOrders">Sell Orders</option>
+                            <option value="buyOrders">Buy Orders</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Order:</label>
+                        <select id="market-sort-order">
+                            <option value="asc">Ascending</option>
+                            <option value="desc">Descending</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Search:</label>
+                        <input type="text" id="market-search" placeholder="Search items...">
+                    </div>
+                </div>
+            </section>
+
+            <section class="stats-bar">
+                <div class="stat">
+                    <span class="stat-value" id="market-stat-total">0</span>
+                    <span class="stat-label">Total Items</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="market-stat-filtered">0</span>
+                    <span class="stat-label">Filtered Items</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="market-stat-sell">0</span>
+                    <span class="stat-label">With Sell Orders</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value" id="market-stat-buy">0</span>
+                    <span class="stat-label">With Buy Orders</span>
+                </div>
+            </section>
+
+            <section class="inventory-display">
+                <div id="market-content"></div>
+            </section>
+        `;
+
+        // Render tag filter checkboxes
+        renderTagFilters(tags);
+
+        // Setup event listeners
+        setupMarketEventListeners();
+
+        // Initial render
+        renderMarketTable();
+
+    } catch (error) {
+        main.innerHTML = `<section><p class="error-message">Error loading market data: ${error.message}</p></section>`;
+    } finally {
+        document.getElementById('loading-overlay').classList.add('hidden');
+    }
+}
+
+function renderTagFilters(tags) {
+    const container = document.getElementById('tag-filter-container');
+    container.innerHTML = tags.map(tag => `
+        <label class="tag-filter-item">
+            <input type="checkbox" value="${tag}" class="tag-checkbox">
+            <span>${tag}</span>
+        </label>
+    `).join('');
+}
+
+function setupMarketEventListeners() {
+    // Tag checkboxes
+    document.querySelectorAll('.tag-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                marketViewer.selectedTags.add(e.target.value);
+            } else {
+                marketViewer.selectedTags.delete(e.target.value);
+            }
+            renderMarketTable();
+        });
+    });
+
+    // Rarity filter
+    document.getElementById('market-rarity-filter').addEventListener('change', (e) => {
+        marketViewer.selectedRarity = e.target.value;
+        renderMarketTable();
+    });
+
+    // Sort controls
+    document.getElementById('market-sort-by').addEventListener('change', (e) => {
+        marketViewer.sortBy = e.target.value;
+        renderMarketTable();
+    });
+
+    document.getElementById('market-sort-order').addEventListener('change', (e) => {
+        marketViewer.sortOrder = e.target.value;
+        renderMarketTable();
+    });
+
+    // Search
+    document.getElementById('market-search').addEventListener('input', (e) => {
+        marketViewer.searchTerm = e.target.value;
+        renderMarketTable();
+    });
+}
+
+function renderMarketTable() {
+    const items = marketViewer.getFilteredItems();
+    const content = document.getElementById('market-content');
+
+    // Update stats
+    document.getElementById('market-stat-total').textContent = marketViewer.items.length.toLocaleString();
+    document.getElementById('market-stat-filtered').textContent = items.length.toLocaleString();
+    document.getElementById('market-stat-sell').textContent = items.filter(i => i.hasSellOrders).length.toLocaleString();
+    document.getElementById('market-stat-buy').textContent = items.filter(i => i.hasBuyOrders).length.toLocaleString();
+
+    if (items.length === 0) {
+        content.innerHTML = '<p class="empty-state">No items match your filters.</p>';
+        return;
+    }
+
+    content.innerHTML = `
+        <table class="inventory-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Tier</th>
+                    <th>Rarity</th>
+                    <th>Tag/Type</th>
+                    <th>Sell Orders</th>
+                    <th>Buy Orders</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map(item => `
+                    <tr class="rarity-row-${item.rarity.toLowerCase()}">
+                        <td class="item-name">${escapeHtml(item.name)}</td>
+                        <td><span class="tier-badge">T${item.tier}</span></td>
+                        <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
+                        <td>${escapeHtml(item.tag)}</td>
+                        <td class="count-value">${item.sellOrders}</td>
+                        <td class="count-value">${item.buyOrders}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize navigation
+setupNavigation();

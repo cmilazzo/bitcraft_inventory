@@ -69,6 +69,46 @@ header h1 {
     letter-spacing: 0.02em;
 }
 
+/* View Navigation */
+.view-navigation {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.nav-tab {
+    padding: 0.5rem 1.5rem;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.nav-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+    border-radius: 8px 8px 0 0;
+}
+
+.nav-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.nav-tab.active:hover {
+    background: transparent;
+}
+
 /* Main content */
 main {
     max-width: 1600px;
@@ -301,6 +341,49 @@ section h2 {
     height: 14px;
     cursor: pointer;
     accent-color: var(--accent);
+}
+
+/* Tag Filter Container */
+.tag-filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.tag-filter-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.tag-filter-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+}
+
+.tag-filter-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.tag-filter-item span {
+    color: var(--text-primary);
 }
 
 /* Stats Bar */

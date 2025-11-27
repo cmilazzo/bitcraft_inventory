@@ -1394,7 +1394,35 @@ class MarketViewer {
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
-            console.log(`Fetching price for item ${itemId}`, decoded);
+            console.log(`\n=== Fetching price for item ${itemId} ===`);
+            console.log('Decoded object:', JSON.stringify(decoded, null, 2));
+
+            if (decoded && typeof decoded === 'object') {
+                console.log('Top-level keys:', Object.keys(decoded));
+
+                // Deep inspect the structure
+                for (const key of Object.keys(decoded)) {
+                    const value = decoded[key];
+                    if (value && typeof value === 'object') {
+                        console.log(`  ${key}:`, Array.isArray(value) ? `Array(${value.length})` : `Object with keys: ${Object.keys(value).join(', ')}`);
+
+                        // If it's an object (not array), show its keys too
+                        if (!Array.isArray(value)) {
+                            for (const subKey of Object.keys(value)) {
+                                const subValue = value[subKey];
+                                if (Array.isArray(subValue)) {
+                                    console.log(`    ${key}.${subKey}: Array(${subValue.length})`);
+                                    if (subValue.length > 0 && subValue[0]) {
+                                        console.log(`      First item keys:`, Object.keys(subValue[0]));
+                                    }
+                                }
+                            }
+                        } else if (value.length > 0 && value[0] && typeof value[0] === 'object') {
+                            console.log(`    First array item keys:`, Object.keys(value[0]));
+                        }
+                    }
+                }
+            }
 
             // Try different paths for sellOrders
             let sellOrders = null;
@@ -1405,9 +1433,12 @@ class MarketViewer {
                 sellOrders = decoded.marketItem.sellOrders;
             } else if (decoded && decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
                 sellOrders = decoded.item.sellOrders;
+            } else if (decoded && Array.isArray(decoded)) {
+                // Maybe the entire decoded object is an array of sell orders
+                sellOrders = decoded;
             }
 
-            console.log(`SellOrders for item ${itemId}:`, sellOrders);
+            console.log(`SellOrders found:`, sellOrders);
 
             // Extract the lowest price from sellOrders
             if (sellOrders && sellOrders.length > 0) {

@@ -1394,13 +1394,30 @@ class MarketViewer {
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
+            console.log(`Fetching price for item ${itemId}`, decoded);
+
+            // Try different paths for sellOrders
+            let sellOrders = null;
+
+            if (decoded && decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
+                sellOrders = decoded.sellOrders;
+            } else if (decoded && decoded.marketItem && decoded.marketItem.sellOrders && Array.isArray(decoded.marketItem.sellOrders)) {
+                sellOrders = decoded.marketItem.sellOrders;
+            } else if (decoded && decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
+                sellOrders = decoded.item.sellOrders;
+            }
+
+            console.log(`SellOrders for item ${itemId}:`, sellOrders);
+
             // Extract the lowest price from sellOrders
-            if (decoded && decoded.sellOrders && Array.isArray(decoded.sellOrders) && decoded.sellOrders.length > 0) {
-                const prices = decoded.sellOrders
+            if (sellOrders && sellOrders.length > 0) {
+                const prices = sellOrders
                     .map(order => order.priceThreshold)
                     .filter(price => price != null && price > 0);
 
-                return prices.length > 0 ? Math.min(...prices) : null;
+                const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
+                console.log(`Lowest price for item ${itemId}:`, lowestPrice);
+                return lowestPrice;
             }
 
             return null;
@@ -1535,6 +1552,11 @@ async function switchView(view) {
         // Remove market controls if present
         if (marketControlsSection) {
             marketControlsSection.remove();
+        }
+
+        // Show inventory controls if they exist (they might have been hidden)
+        if (viewControlsSection) {
+            viewControlsSection.style.display = '';
         }
 
         footer.style.display = 'flex';

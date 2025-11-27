@@ -1324,11 +1324,20 @@ class MarketViewer {
     }
 
     extractMarketItems(data) {
-        // Market data structure: data.items is an array of item objects
+        // Market data structure: the decoded data is the items array itself or has items property
         const items = [];
 
-        if (data && data.items && Array.isArray(data.items)) {
-            for (const item of data.items) {
+        // Try to get the items array from different possible locations
+        let itemsArray = null;
+
+        if (Array.isArray(data)) {
+            itemsArray = data;
+        } else if (data && data.items && Array.isArray(data.items)) {
+            itemsArray = data.items;
+        }
+
+        if (itemsArray) {
+            for (const item of itemsArray) {
                 if (item && typeof item === 'object' && item.name) {
                     items.push({
                         id: item.id || '',
@@ -1348,6 +1357,7 @@ class MarketViewer {
             }
         }
 
+        console.log(`Extracted ${items.length} market items`);
         return items;
     }
 
@@ -1442,13 +1452,16 @@ async function switchView(view) {
 
     // Show/hide appropriate sections
     const inventorySections = document.querySelectorAll('.player-search, .active-players, .view-controls');
+    const footer = document.querySelector('footer');
     const main = document.querySelector('main');
 
     if (view === 'inventory') {
         inventorySections.forEach(section => section.style.display = '');
+        footer.style.display = 'flex';
         // Existing inventory functionality
     } else if (view === 'market') {
         inventorySections.forEach(section => section.style.display = 'none');
+        footer.style.display = 'none';
         await renderMarketView();
     }
 }

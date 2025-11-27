@@ -1420,12 +1420,8 @@ class MarketViewer {
             } else if (this.sortBy === 'rarity') {
                 const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
                 comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
-            } else if (this.sortBy === 'sellOrders') {
+            } else if (this.sortBy === 'quantity') {
                 comparison = a.sellOrders - b.sellOrders;
-            } else if (this.sortBy === 'buyOrders') {
-                comparison = a.buyOrders - b.buyOrders;
-            } else if (this.sortBy === 'totalOrders') {
-                comparison = a.totalOrders - b.totalOrders;
             }
 
             return this.sortOrder === 'desc' ? -comparison : comparison;
@@ -1563,12 +1559,8 @@ async function renderMarketView() {
                         <span class="stat-label">Filtered Items</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-value" id="market-stat-sell">0</span>
-                        <span class="stat-label">With Sell Orders</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="market-stat-buy">0</span>
-                        <span class="stat-label">With Buy Orders</span>
+                        <span class="stat-value" id="market-stat-available">0</span>
+                        <span class="stat-label">Available</span>
                     </div>
                 </section>
             `;
@@ -1601,9 +1593,7 @@ async function renderMarketView() {
                                 <option value="name">Name</option>
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
-                                <option value="sellOrders">Sell Orders</option>
-                                <option value="buyOrders">Buy Orders</option>
-                                <option value="totalOrders">Total Orders</option>
+                                <option value="quantity">Quantity</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -1698,8 +1688,10 @@ function renderMarketTable() {
     // Update stats
     document.getElementById('market-stat-total').textContent = marketViewer.items.length.toLocaleString();
     document.getElementById('market-stat-filtered').textContent = items.length.toLocaleString();
-    document.getElementById('market-stat-sell').textContent = items.filter(i => i.hasSellOrders).length.toLocaleString();
-    document.getElementById('market-stat-buy').textContent = items.filter(i => i.hasBuyOrders).length.toLocaleString();
+
+    // Calculate total available quantity across all filtered items
+    const totalAvailable = items.reduce((sum, item) => sum + item.sellOrders, 0);
+    document.getElementById('market-stat-available').textContent = totalAvailable.toLocaleString();
 
     if (items.length === 0) {
         content.innerHTML = '<p class="empty-state">No items match your filters.</p>';
@@ -1714,8 +1706,7 @@ function renderMarketTable() {
                     <th>Tier</th>
                     <th>Rarity</th>
                     <th>Tag/Type</th>
-                    <th>Sell Orders</th>
-                    <th>Buy Orders</th>
+                    <th>Quantity</th>
                 </tr>
             </thead>
             <tbody>
@@ -1725,8 +1716,7 @@ function renderMarketTable() {
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
-                        <td class="count-value">${item.sellOrders}</td>
-                        <td class="count-value">${item.buyOrders}</td>
+                        <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
             </tbody>

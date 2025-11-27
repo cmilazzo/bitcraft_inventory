@@ -1390,60 +1390,36 @@ class MarketViewer {
 
     async fetchItemPrice(itemId) {
         try {
-            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json?hasOrders=true&hasSellOrders=true`);
+            // Try fetching the market orders page for this specific item
+            const response = await fetch(`${API_BASE}/market/item/${itemId}/orders/__data.json`);
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
-            console.log(`\n=== Fetching price for item ${itemId} ===`);
-            console.log('Decoded object:', JSON.stringify(decoded, null, 2));
+            console.log(`\n=== Fetching orders for item ${itemId} ===`);
+            console.log('Decoded orders:', decoded);
 
-            if (decoded && typeof decoded === 'object') {
-                console.log('Top-level keys:', Object.keys(decoded));
-
-                // Deep inspect the structure
-                for (const key of Object.keys(decoded)) {
-                    const value = decoded[key];
-                    if (value && typeof value === 'object') {
-                        console.log(`  ${key}:`, Array.isArray(value) ? `Array(${value.length})` : `Object with keys: ${Object.keys(value).join(', ')}`);
-
-                        // If it's an object (not array), show its keys too
-                        if (!Array.isArray(value)) {
-                            for (const subKey of Object.keys(value)) {
-                                const subValue = value[subKey];
-                                if (Array.isArray(subValue)) {
-                                    console.log(`    ${key}.${subKey}: Array(${subValue.length})`);
-                                    if (subValue.length > 0 && subValue[0]) {
-                                        console.log(`      First item keys:`, Object.keys(subValue[0]));
-                                    }
-                                }
-                            }
-                        } else if (value.length > 0 && value[0] && typeof value[0] === 'object') {
-                            console.log(`    First array item keys:`, Object.keys(value[0]));
-                        }
-                    }
-                }
-            }
-
-            // Try different paths for sellOrders
+            // The orders endpoint should have sellOrders and buyOrders arrays
             let sellOrders = null;
 
+            // Try to find sellOrders in the decoded structure
             if (decoded && decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
                 sellOrders = decoded.sellOrders;
-            } else if (decoded && decoded.marketItem && decoded.marketItem.sellOrders && Array.isArray(decoded.marketItem.sellOrders)) {
-                sellOrders = decoded.marketItem.sellOrders;
-            } else if (decoded && decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
-                sellOrders = decoded.item.sellOrders;
-            } else if (decoded && Array.isArray(decoded)) {
-                // Maybe the entire decoded object is an array of sell orders
-                sellOrders = decoded;
+            } else if (decoded && decoded.orders && decoded.orders.sellOrders && Array.isArray(decoded.orders.sellOrders)) {
+                sellOrders = decoded.orders.sellOrders;
+            } else if (decoded && decoded.marketOrders && decoded.marketOrders.sellOrders && Array.isArray(decoded.marketOrders.sellOrders)) {
+                sellOrders = decoded.marketOrders.sellOrders;
             }
 
-            console.log(`SellOrders found:`, sellOrders);
+            console.log(`SellOrders found for item ${itemId}:`, sellOrders);
 
             // Extract the lowest price from sellOrders
             if (sellOrders && sellOrders.length > 0) {
+                // Log the first order to see its structure
+                console.log('First sell order:', sellOrders[0]);
+
+                // Try different possible property names for price
                 const prices = sellOrders
-                    .map(order => order.priceThreshold)
+                    .map(order => order.priceThreshold || order.price || order.pricePerUnit || order.unitPrice)
                     .filter(price => price != null && price > 0);
 
                 const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
@@ -1451,6 +1427,7 @@ class MarketViewer {
                 return lowestPrice;
             }
 
+            console.log(`No sell orders found for item ${itemId}`);
             return null;
         } catch (error) {
             console.error(`Error fetching price for item ${itemId}:`, error);

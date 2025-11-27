@@ -343,6 +343,28 @@ section h2 {
     accent-color: var(--accent);
 }
 
+/* Market Controls */
+.market-controls {
+    background: var(--bg-secondary);
+    padding: 0.875rem;
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.market-controls h2 {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* Tag Filter Container */
 .tag-filter-container {
     display: flex;
@@ -687,6 +709,19 @@ section h2 {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--text-primary);
+}
+
+.price-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+}
+
+.loading-text {
+    color: var(--text-muted);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.75rem;
 }
 
 .player-tags {

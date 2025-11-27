@@ -1370,7 +1370,9 @@ class MarketViewer {
                         sellOrders: item.sellOrders || 0,
                         buyOrders: item.buyOrders || 0,
                         totalOrders: item.totalOrders || 0,
-                        description: item.description || ''
+                        description: item.description || '',
+                        price: null, // Will be fetched on demand
+                        priceLoaded: false
                     });
                 }
             }
@@ -1378,6 +1380,47 @@ class MarketViewer {
 
         console.log(`Extracted ${items.length} market items`);
         return items;
+    }
+
+    async fetchItemPrice(itemId) {
+        try {
+            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json?hasOrders=true&hasSellOrders=true`);
+            const json = await response.json();
+            const decoded = viewer.decodeSvelteKitData(json);
+
+            // Extract the lowest price from sellOrders
+            if (decoded && decoded.sellOrders && Array.isArray(decoded.sellOrders) && decoded.sellOrders.length > 0) {
+                const prices = decoded.sellOrders
+                    .map(order => order.priceThreshold)
+                    .filter(price => price != null && price > 0);
+
+                return prices.length > 0 ? Math.min(...prices) : null;
+            }
+
+            return null;
+        } catch (error) {
+            console.error(`Error fetching price for item ${itemId}:`, error);
+            return null;
+        }
+    }
+
+    async loadPricesForVisibleItems(items) {
+        // Only fetch prices for items that don't have them yet
+        const itemsNeedingPrices = items.filter(item => !item.priceLoaded && item.sellOrders > 0);
+
+        if (itemsNeedingPrices.length === 0) {
+            return;
+        }
+
+        // Fetch prices in batches to avoid overwhelming the API
+        const batchSize = 10;
+        for (let i = 0; i < itemsNeedingPrices.length; i += batchSize) {
+            const batch = itemsNeedingPrices.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (item) => {
+                item.price = await this.fetchItemPrice(item.id);
+                item.priceLoaded = true;
+            }));
+        }
     }
 
     getAvailableTags() {
@@ -1421,6 +1464,11 @@ class MarketViewer {
             } else if (this.sortBy === 'rarity') {
                 const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
                 comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
+            } else if (this.sortBy === 'price') {
+                // Sort by price, treating null as highest value
+                const aPrice = a.price ?? Infinity;
+                const bPrice = b.price ?? Infinity;
+                comparison = aPrice - bPrice;
             } else if (this.sortBy === 'quantity') {
                 comparison = a.sellOrders - b.sellOrders;
             }
@@ -1471,15 +1519,21 @@ async function switchView(view) {
     // Show/hide appropriate sections
     const inventorySections = document.querySelectorAll('.player-search, .active-players');
     const viewControlsSection = document.querySelector('.view-controls');
+    const marketControlsSection = document.querySelector('.market-controls');
     const footer = document.querySelector('footer');
 
     if (view === 'inventory') {
         // Show inventory sections
         inventorySections.forEach(section => section.style.display = '');
 
-        // Show view-controls only if it's the inventory controls (has filter-tier)
-        if (viewControlsSection && viewControlsSection.querySelector('#filter-tier')) {
+        // Show inventory controls
+        if (viewControlsSection) {
             viewControlsSection.style.display = '';
+        }
+
+        // Hide market controls
+        if (marketControlsSection) {
+            marketControlsSection.style.display = 'none';
         }
 
         footer.style.display = 'flex';
@@ -1505,11 +1559,12 @@ async function switchView(view) {
     } else if (view === 'market') {
         inventorySections.forEach(section => section.style.display = 'none');
 
-        // Hide inventory view-controls if present
-        if (viewControlsSection && viewControlsSection.querySelector('#filter-tier')) {
+        // Hide inventory controls
+        if (viewControlsSection) {
             viewControlsSection.style.display = 'none';
         }
 
+        // Market controls will be shown by renderMarketView
         footer.style.display = 'none';
         await renderMarketView();
     }
@@ -1569,7 +1624,7 @@ async function renderMarketView() {
 
         if (inventoryDisplay) {
             inventoryDisplay.outerHTML = `
-                <section class="view-controls">
+                <section class="market-controls">
                     <h2>Market Filters</h2>
                     <div class="controls-row">
                         <div class="control-group">
@@ -1594,6 +1649,7 @@ async function renderMarketView() {
                                 <option value="name">Name</option>
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
+                                <option value="price">Price</option>
                                 <option value="quantity">Quantity</option>
                             </select>
                         </div>
@@ -1682,7 +1738,7 @@ function setupMarketEventListeners() {
     });
 }
 
-function renderMarketTable() {
+async function renderMarketTable() {
     const items = marketViewer.getFilteredItems();
     const content = document.getElementById('market-content');
 
@@ -1702,6 +1758,7 @@ function renderMarketTable() {
         return;
     }
 
+    // Render initial table with loading state for prices
     content.innerHTML = `
         <table class="inventory-table">
             <thead>
@@ -1710,22 +1767,41 @@ function renderMarketTable() {
                     <th>Tier</th>
                     <th>Rarity</th>
                     <th>Tag/Type</th>
+                    <th>Price</th>
                     <th>Quantity</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="market-table-body">
                 ${items.map(item => `
-                    <tr class="rarity-row-${item.rarity.toLowerCase()}">
+                    <tr class="rarity-row-${item.rarity.toLowerCase()}" data-item-id="${item.id}">
                         <td class="item-name">${escapeHtml(item.name)}</td>
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
+                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
             </tbody>
         </table>
     `;
+
+    // Load prices asynchronously
+    await marketViewer.loadPricesForVisibleItems(items);
+
+    // Update the table with loaded prices
+    const tbody = document.getElementById('market-table-body');
+    if (tbody) {
+        items.forEach(item => {
+            const row = tbody.querySelector(`tr[data-item-id="${item.id}"]`);
+            if (row) {
+                const priceCell = row.querySelector('.price-value');
+                if (priceCell) {
+                    priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
+                }
+            }
+        });
+    }
 }
 
 function escapeHtml(text) {

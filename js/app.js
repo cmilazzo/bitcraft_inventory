@@ -1445,8 +1445,32 @@ class MarketViewer {
     }
 
     async loadPricesForVisibleItems(items) {
+        console.log('[loadPricesForVisibleItems] Called with', items.length, 'items');
+
+        // Debug: check first few items
+        if (items.length > 0) {
+            console.log('[loadPricesForVisibleItems] First 3 items check:');
+            items.slice(0, 3).forEach((item, i) => {
+                console.log(`  Item ${i}: id=${item.id}, sellOrders=${item.sellOrders} (${typeof item.sellOrders}), priceLoaded=${item.priceLoaded}`);
+            });
+        }
+
         // Only fetch prices for items that don't have them yet
-        const itemsNeedingPrices = items.filter(item => !item.priceLoaded && item.sellOrders > 0);
+        const itemsNeedingPrices = items.filter(item => {
+            const needsPrice = !item.priceLoaded && item.sellOrders > 0;
+            return needsPrice;
+        });
+
+        console.log(`[loadPricesForVisibleItems] Total items: ${items.length}, Items needing prices: ${itemsNeedingPrices.length}`);
+        if (itemsNeedingPrices.length > 0) {
+            console.log('[loadPricesForVisibleItems] First item needing price:', itemsNeedingPrices[0]);
+        } else {
+            console.log('[loadPricesForVisibleItems] No items need prices. Reasons:');
+            const alreadyLoaded = items.filter(item => item.priceLoaded).length;
+            const noSellOrders = items.filter(item => !item.sellOrders || item.sellOrders === 0).length;
+            console.log(`  - Already loaded: ${alreadyLoaded}`);
+            console.log(`  - No sell orders: ${noSellOrders}`);
+        }
 
         if (itemsNeedingPrices.length === 0) {
             return;
@@ -1456,6 +1480,7 @@ class MarketViewer {
         const batchSize = 10;
         for (let i = 0; i < itemsNeedingPrices.length; i += batchSize) {
             const batch = itemsNeedingPrices.slice(i, i + batchSize);
+            console.log(`Fetching prices for batch ${i / batchSize + 1}, ${batch.length} items`);
             await Promise.all(batch.map(async (item) => {
                 item.price = await this.fetchItemPrice(item.id);
                 item.priceLoaded = true;
@@ -1827,6 +1852,13 @@ function setupMarketEventListeners() {
 async function renderMarketTable() {
     const items = marketViewer.getFilteredItems();
     const content = document.getElementById('market-content');
+
+    console.log('[renderMarketTable] Total filtered items:', items.length);
+    if (items.length > 0) {
+        console.log('[renderMarketTable] First item:', items[0]);
+        console.log('[renderMarketTable] First item sellOrders:', items[0].sellOrders, 'Type:', typeof items[0].sellOrders);
+        console.log('[renderMarketTable] First item priceLoaded:', items[0].priceLoaded);
+    }
 
     // Update stats
     document.getElementById('market-stat-total').textContent = marketViewer.items.length.toLocaleString();

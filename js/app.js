@@ -1394,32 +1394,47 @@ class MarketViewer {
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
+            console.log(`[Item ${itemId}] Decoded:`, decoded);
+            console.log(`[Item ${itemId}] Keys:`, decoded ? Object.keys(decoded) : 'null');
+
             if (!decoded) {
+                console.log(`[Item ${itemId}] No decoded data`);
                 return null;
             }
 
             // The decoded structure should have sellOrders directly
             let sellOrders = decoded.sellOrders;
+            console.log(`[Item ${itemId}] sellOrders at root:`, sellOrders);
 
             // If not found directly, try nested paths
             if (!sellOrders && decoded.marketItem) {
                 sellOrders = decoded.marketItem.sellOrders;
+                console.log(`[Item ${itemId}] sellOrders in marketItem:`, sellOrders);
             }
 
             if (!sellOrders && decoded.item) {
                 sellOrders = decoded.item.sellOrders;
+                console.log(`[Item ${itemId}] sellOrders in item:`, sellOrders);
             }
 
             if (sellOrders && Array.isArray(sellOrders) && sellOrders.length > 0) {
+                console.log(`[Item ${itemId}] Found ${sellOrders.length} sell orders`);
+                console.log(`[Item ${itemId}] First order:`, sellOrders[0]);
+
                 // Extract prices from priceThreshold property
                 const prices = sellOrders
                     .map(order => order.priceThreshold)
                     .filter(price => price != null && price > 0);
 
+                console.log(`[Item ${itemId}] Prices extracted:`, prices);
+
                 if (prices.length > 0) {
                     const lowestPrice = Math.min(...prices);
+                    console.log(`[Item ${itemId}] Lowest price: ${lowestPrice}`);
                     return lowestPrice;
                 }
+            } else {
+                console.log(`[Item ${itemId}] No sell orders array found`);
             }
 
             return null;

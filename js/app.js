@@ -1309,11 +1309,13 @@ class MarketViewer {
     async fetchMarketData() {
         try {
             const response = await fetch(`${API_BASE}/market/__data.json?hasOrders=true&hasSellOrders=true`);
-            const text = await response.text();
-            const data = devalue.parse(text);
+            const json = await response.json();
 
-            // Extract items from the devalue data structure
-            this.items = this.extractMarketItems(data);
+            // Use the same devalue decoder as InventoryViewer
+            const decoded = viewer.decodeSvelteKitData(json);
+
+            // Extract items from the decoded data structure
+            this.items = this.extractMarketItems(decoded);
             return this.items;
         } catch (error) {
             console.error('Error fetching market data:', error);
@@ -1322,32 +1324,26 @@ class MarketViewer {
     }
 
     extractMarketItems(data) {
-        // Market data uses same devalue format as player inventory
-        // Navigate through the nested structure to find items array
+        // Market data structure: data.items is an array of item objects
         const items = [];
 
-        if (data && data.nodes && Array.isArray(data.nodes)) {
-            for (const node of data.nodes) {
-                if (node && node.data && Array.isArray(node.data)) {
-                    // Look for the items array in the data structure
-                    for (const item of node.data) {
-                        if (item && typeof item === 'object' && item.name) {
-                            items.push({
-                                id: item.id || '',
-                                name: item.name || 'Unknown',
-                                tier: item.tier ?? 0,
-                                rarity: item.rarityStr || item.rarity || 'Common',
-                                tag: item.tag || 'Unknown',
-                                hasSellOrders: item.hasSellOrders || false,
-                                hasBuyOrders: item.hasBuyOrders || false,
-                                sellOrders: item.sellOrders || 0,
-                                buyOrders: item.buyOrders || 0,
-                                totalOrders: item.totalOrders || 0,
-                                volume: item.volume || 0,
-                                description: item.description || ''
-                            });
-                        }
-                    }
+        if (data && data.items && Array.isArray(data.items)) {
+            for (const item of data.items) {
+                if (item && typeof item === 'object' && item.name) {
+                    items.push({
+                        id: item.id || '',
+                        name: item.name || 'Unknown',
+                        tier: item.tier ?? 0,
+                        rarity: item.rarityStr || item.rarity || 'Common',
+                        tag: item.tag || 'Unknown',
+                        hasSellOrders: item.hasSellOrders || false,
+                        hasBuyOrders: item.hasBuyOrders || false,
+                        sellOrders: item.sellOrders || 0,
+                        buyOrders: item.buyOrders || 0,
+                        totalOrders: item.totalOrders || 0,
+                        volume: item.volume || 0,
+                        description: item.description || ''
+                    });
                 }
             }
         }

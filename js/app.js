@@ -1469,22 +1469,15 @@ class MarketViewer {
     }
 
     async loadPricesForVisibleItems(items) {
-        // Only fetch prices for items that don't have them yet
-        const itemsNeedingPrices = items.filter(item => !item.priceLoaded && item.sellOrders > 0);
-
-        if (itemsNeedingPrices.length === 0) {
-            return;
-        }
-
-        // Fetch prices in batches to avoid overwhelming the API
-        const batchSize = 10;
-        for (let i = 0; i < itemsNeedingPrices.length; i += batchSize) {
-            const batch = itemsNeedingPrices.slice(i, i + batchSize);
-            await Promise.all(batch.map(async (item) => {
-                item.price = await this.fetchItemPrice(item.id);
+        // Price data is not available through the public API
+        // The individual item endpoints don't return actual sell order details
+        // Just mark all items as loaded with null price
+        items.forEach(item => {
+            if (!item.priceLoaded) {
+                item.price = null;
                 item.priceLoaded = true;
-            }));
-        }
+            }
+        });
     }
 
     getAvailableTags() {
@@ -1755,7 +1748,6 @@ async function renderMarketView() {
                                 <option value="name">Name</option>
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
-                                <option value="price">Price</option>
                                 <option value="quantity">Quantity</option>
                             </select>
                         </div>
@@ -1868,7 +1860,7 @@ async function renderMarketTable() {
         return;
     }
 
-    // Render initial table with loading state for prices
+    // Render table (prices not available via public API)
     content.innerHTML = `
         <table class="inventory-table">
             <thead>
@@ -1877,41 +1869,26 @@ async function renderMarketTable() {
                     <th>Tier</th>
                     <th>Rarity</th>
                     <th>Tag/Type</th>
-                    <th>Price</th>
-                    <th>Quantity</th>
+                    <th>Available</th>
                 </tr>
             </thead>
             <tbody id="market-table-body">
                 ${items.map(item => `
                     <tr class="rarity-row-${item.rarity.toLowerCase()}" data-item-id="${item.id}">
-                        <td class="item-name">${escapeHtml(item.name)}</td>
+                        <td class="item-name">
+                            <a href="https://bitjita.com/market/item/${item.id}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">
+                                ${escapeHtml(item.name)}
+                            </a>
+                        </td>
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
-                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
             </tbody>
         </table>
     `;
-
-    // Load prices asynchronously
-    await marketViewer.loadPricesForVisibleItems(items);
-
-    // Update the table with loaded prices
-    const tbody = document.getElementById('market-table-body');
-    if (tbody) {
-        items.forEach(item => {
-            const row = tbody.querySelector(`tr[data-item-id="${item.id}"]`);
-            if (row) {
-                const priceCell = row.querySelector('.price-value');
-                if (priceCell) {
-                    priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
-                }
-            }
-        });
-    }
 }
 
 function escapeHtml(text) {

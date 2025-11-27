@@ -1311,8 +1311,14 @@ class MarketViewer {
             const response = await fetch(`${API_BASE}/market/__data.json?hasOrders=true&hasSellOrders=true`);
             const json = await response.json();
 
+            console.log('Raw market JSON:', json);
+
             // Use the same devalue decoder as InventoryViewer
             const decoded = viewer.decodeSvelteKitData(json);
+
+            console.log('Decoded market data:', decoded);
+            console.log('Decoded data type:', typeof decoded, Array.isArray(decoded));
+            console.log('Decoded data keys:', decoded ? Object.keys(decoded) : 'null');
 
             // Extract items from the decoded data structure
             this.items = this.extractMarketItems(decoded);
@@ -1453,12 +1459,35 @@ async function switchView(view) {
     // Show/hide appropriate sections
     const inventorySections = document.querySelectorAll('.player-search, .active-players, .view-controls');
     const footer = document.querySelector('footer');
-    const main = document.querySelector('main');
 
     if (view === 'inventory') {
+        // Show inventory sections
         inventorySections.forEach(section => section.style.display = '');
         footer.style.display = 'flex';
-        // Existing inventory functionality
+
+        // Restore original inventory HTML if it was replaced by market view
+        if (originalInventoryHTML) {
+            const marketFilters = document.querySelector('.market-filters');
+            const statsBar = document.querySelector('.stats-bar');
+
+            if (marketFilters) {
+                marketFilters.remove();
+            }
+
+            if (statsBar && statsBar.querySelector('#market-stat-total')) {
+                // Replace market stats with inventory stats
+                statsBar.outerHTML = originalInventoryHTML.statsBar;
+            }
+
+            const inventoryDisplay = document.querySelector('.inventory-display');
+            if (inventoryDisplay && inventoryDisplay.querySelector('#market-content')) {
+                // Replace market display with inventory display
+                inventoryDisplay.outerHTML = originalInventoryHTML.inventoryDisplay;
+            }
+
+            // Re-render inventory
+            viewer.render();
+        }
     } else if (view === 'market') {
         inventorySections.forEach(section => section.style.display = 'none');
         footer.style.display = 'none';
@@ -1466,8 +1495,23 @@ async function switchView(view) {
     }
 }
 
+// Store original inventory HTML so we can restore it
+let originalInventoryHTML = null;
+
 async function renderMarketView() {
     const main = document.querySelector('main');
+
+    // Store the original inventory sections before replacing them
+    if (!originalInventoryHTML) {
+        const statsBar = document.querySelector('.stats-bar');
+        const inventoryDisplay = document.querySelector('.inventory-display');
+        if (statsBar && inventoryDisplay) {
+            originalInventoryHTML = {
+                statsBar: statsBar.outerHTML,
+                inventoryDisplay: inventoryDisplay.outerHTML
+            };
+        }
+    }
 
     // Show loading
     document.getElementById('loading-overlay').classList.remove('hidden');
@@ -1480,74 +1524,82 @@ async function renderMarketView() {
 
         const tags = marketViewer.getAvailableTags();
 
-        // Build market view HTML
-        main.innerHTML = `
-            <section class="market-filters">
-                <h2>Market Filters</h2>
-                <div class="controls-row">
-                    <div class="control-group">
-                        <label>Tags/Types (Multi-select):</label>
-                        <div id="tag-filter-container" class="tag-filter-container"></div>
-                    </div>
-                    <div class="control-group">
-                        <label>Rarity:</label>
-                        <select id="market-rarity-filter">
-                            <option value="all">All Rarities</option>
-                            <option value="Common">Common</option>
-                            <option value="Uncommon">Uncommon</option>
-                            <option value="Rare">Rare</option>
-                            <option value="Epic">Epic</option>
-                            <option value="Legendary">Legendary</option>
-                            <option value="Mythic">Mythic</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Sort By:</label>
-                        <select id="market-sort-by">
-                            <option value="name">Name</option>
-                            <option value="tier">Tier</option>
-                            <option value="rarity">Rarity</option>
-                            <option value="sellOrders">Sell Orders</option>
-                            <option value="buyOrders">Buy Orders</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Order:</label>
-                        <select id="market-sort-order">
-                            <option value="asc">Ascending</option>
-                            <option value="desc">Descending</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Search:</label>
-                        <input type="text" id="market-search" placeholder="Search items...">
-                    </div>
-                </div>
-            </section>
+        // Find and replace stats bar and inventory display sections
+        const statsBar = document.querySelector('.stats-bar');
+        const inventoryDisplay = document.querySelector('.inventory-display');
 
-            <section class="stats-bar">
-                <div class="stat">
-                    <span class="stat-value" id="market-stat-total">0</span>
-                    <span class="stat-label">Total Items</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-value" id="market-stat-filtered">0</span>
-                    <span class="stat-label">Filtered Items</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-value" id="market-stat-sell">0</span>
-                    <span class="stat-label">With Sell Orders</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-value" id="market-stat-buy">0</span>
-                    <span class="stat-label">With Buy Orders</span>
-                </div>
-            </section>
+        if (statsBar) {
+            statsBar.outerHTML = `
+                <section class="stats-bar">
+                    <div class="stat">
+                        <span class="stat-value" id="market-stat-total">0</span>
+                        <span class="stat-label">Total Items</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="market-stat-filtered">0</span>
+                        <span class="stat-label">Filtered Items</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="market-stat-sell">0</span>
+                        <span class="stat-label">With Sell Orders</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="market-stat-buy">0</span>
+                        <span class="stat-label">With Buy Orders</span>
+                    </div>
+                </section>
+            `;
+        }
 
-            <section class="inventory-display">
-                <div id="market-content"></div>
-            </section>
-        `;
+        if (inventoryDisplay) {
+            inventoryDisplay.outerHTML = `
+                <section class="market-filters">
+                    <h2>Market Filters</h2>
+                    <div class="controls-row">
+                        <div class="control-group">
+                            <label>Tags/Types (Multi-select):</label>
+                            <div id="tag-filter-container" class="tag-filter-container"></div>
+                        </div>
+                        <div class="control-group">
+                            <label>Rarity:</label>
+                            <select id="market-rarity-filter">
+                                <option value="all">All Rarities</option>
+                                <option value="Common">Common</option>
+                                <option value="Uncommon">Uncommon</option>
+                                <option value="Rare">Rare</option>
+                                <option value="Epic">Epic</option>
+                                <option value="Legendary">Legendary</option>
+                                <option value="Mythic">Mythic</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Sort By:</label>
+                            <select id="market-sort-by">
+                                <option value="name">Name</option>
+                                <option value="tier">Tier</option>
+                                <option value="rarity">Rarity</option>
+                                <option value="sellOrders">Sell Orders</option>
+                                <option value="buyOrders">Buy Orders</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Order:</label>
+                            <select id="market-sort-order">
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Search:</label>
+                            <input type="text" id="market-search" placeholder="Search items...">
+                        </div>
+                    </div>
+                </section>
+                <section class="inventory-display">
+                    <div id="market-content"></div>
+                </section>
+            `;
+        }
 
         // Render tag filter checkboxes
         renderTagFilters(tags);
@@ -1559,7 +1611,10 @@ async function renderMarketView() {
         renderMarketTable();
 
     } catch (error) {
-        main.innerHTML = `<section><p class="error-message">Error loading market data: ${error.message}</p></section>`;
+        const inventoryDisplay = document.querySelector('.inventory-display') || document.querySelector('.market-filters');
+        if (inventoryDisplay) {
+            inventoryDisplay.innerHTML = `<p class="error-message">Error loading market data: ${error.message}</p>`;
+        }
     } finally {
         document.getElementById('loading-overlay').classList.add('hidden');
     }

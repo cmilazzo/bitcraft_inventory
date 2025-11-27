@@ -1365,6 +1365,8 @@ class MarketViewer {
                         buyOrders: item.buyOrders || 0,
                         totalOrders: item.totalOrders || 0,
                         volume: item.volume || 0,
+                        price: item.price || item.lowestSellPrice || 0,
+                        quantity: item.quantity || item.totalVolume || item.volume || 0,
                         description: item.description || ''
                     });
                 }
@@ -1415,10 +1417,10 @@ class MarketViewer {
             } else if (this.sortBy === 'rarity') {
                 const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
                 comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
-            } else if (this.sortBy === 'sellOrders') {
-                comparison = a.sellOrders - b.sellOrders;
-            } else if (this.sortBy === 'buyOrders') {
-                comparison = a.buyOrders - b.buyOrders;
+            } else if (this.sortBy === 'price') {
+                comparison = a.price - b.price;
+            } else if (this.sortBy === 'quantity') {
+                comparison = a.quantity - b.quantity;
             }
 
             return this.sortOrder === 'desc' ? -comparison : comparison;
@@ -1475,12 +1477,7 @@ async function switchView(view) {
 
         // Restore original inventory HTML if it was replaced by market view
         if (originalInventoryHTML) {
-            const marketFilters = document.querySelector('.market-filters');
             const statsBar = document.querySelector('.stats-bar');
-
-            if (marketFilters) {
-                marketFilters.remove();
-            }
 
             if (statsBar && statsBar.querySelector('#market-stat-total')) {
                 // Replace market stats with inventory stats
@@ -1561,7 +1558,7 @@ async function renderMarketView() {
 
         if (inventoryDisplay) {
             inventoryDisplay.outerHTML = `
-                <section class="market-filters">
+                <section class="view-controls">
                     <h2>Market Filters</h2>
                     <div class="controls-row">
                         <div class="control-group">
@@ -1586,8 +1583,8 @@ async function renderMarketView() {
                                 <option value="name">Name</option>
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
-                                <option value="sellOrders">Sell Orders</option>
-                                <option value="buyOrders">Buy Orders</option>
+                                <option value="price">Price</option>
+                                <option value="quantity">Quantity</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -1698,8 +1695,8 @@ function renderMarketTable() {
                     <th>Tier</th>
                     <th>Rarity</th>
                     <th>Tag/Type</th>
-                    <th>Sell Orders</th>
-                    <th>Buy Orders</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
                 </tr>
             </thead>
             <tbody>
@@ -1709,8 +1706,8 @@ function renderMarketTable() {
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
-                        <td class="count-value">${item.sellOrders}</td>
-                        <td class="count-value">${item.buyOrders}</td>
+                        <td class="count-value">${item.price.toLocaleString()}</td>
+                        <td class="count-value">${item.quantity.toLocaleString()}</td>
                     </tr>
                 `).join('')}
             </tbody>

@@ -1394,32 +1394,29 @@ class MarketViewer {
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
-            console.log(`[Item ${itemId}] Decoded:`, decoded);
+            console.log(`[Item ${itemId}] Fetching price...`);
 
-            if (!decoded) {
-                console.log(`[Item ${itemId}] No decoded data`);
+            if (!decoded || !decoded.marketData || !decoded.marketData.items) {
+                console.log(`[Item ${itemId}] Invalid data structure`);
                 return null;
             }
 
-            // The decoded structure has data nested in marketData
-            let sellOrders = null;
+            // The API returns the full market list instead of just this item
+            // We need to find the specific item in the items array
+            const item = decoded.marketData.items.find(i => i.id === itemId);
 
-            if (decoded.marketData) {
-                console.log(`[Item ${itemId}] marketData keys:`, Object.keys(decoded.marketData));
-
-                // Try to find sellOrders in marketData
-                if (decoded.marketData.sellOrders) {
-                    sellOrders = decoded.marketData.sellOrders;
-                } else if (decoded.marketData.item && decoded.marketData.item.sellOrders) {
-                    sellOrders = decoded.marketData.item.sellOrders;
-                } else if (decoded.marketData.marketItem && decoded.marketData.marketItem.sellOrders) {
-                    sellOrders = decoded.marketData.marketItem.sellOrders;
-                }
+            if (!item) {
+                console.log(`[Item ${itemId}] Item not found in items array`);
+                return null;
             }
+
+            console.log(`[Item ${itemId}] Found item:`, item);
+
+            // Check if the item has sell orders (could be array or object)
+            let sellOrders = item.sellOrders;
 
             if (sellOrders && Array.isArray(sellOrders) && sellOrders.length > 0) {
                 console.log(`[Item ${itemId}] Found ${sellOrders.length} sell orders`);
-                console.log(`[Item ${itemId}] First order:`, sellOrders[0]);
 
                 // Extract prices from priceThreshold property
                 const prices = sellOrders
@@ -1434,7 +1431,7 @@ class MarketViewer {
                     return lowestPrice;
                 }
             } else {
-                console.log(`[Item ${itemId}] No sell orders array found`);
+                console.log(`[Item ${itemId}] sellOrders:`, sellOrders, `(type: ${typeof sellOrders})`);
             }
 
             return null;

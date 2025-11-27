@@ -44,6 +44,16 @@ class InventoryViewer {
     }
 
     async init() {
+        this.setupDomElements();
+        this.setupEventListeners();
+        this.render();
+
+        // Load item database first, then check for URL parameters
+        await this.loadItemDatabase();
+        this.loadPlayersFromUrl();
+    }
+
+    setupDomElements() {
         // DOM elements
         this.playerSearchInput = document.getElementById('player-search');
         this.searchBtn = document.getElementById('search-btn');
@@ -65,7 +75,9 @@ class InventoryViewer {
         this.clearBtn = document.getElementById('clear-btn');
         this.loadingOverlay = document.getElementById('loading-overlay');
         this.expandPackagesCheckbox = document.getElementById('expand-packages');
+    }
 
+    setupEventListeners() {
         // Event listeners
         this.searchBtn.addEventListener('click', () => this.searchPlayer());
         this.playerSearchInput.addEventListener('keypress', (e) => {
@@ -86,12 +98,6 @@ class InventoryViewer {
         this.refreshBtn.addEventListener('click', () => this.refreshAll());
         this.exportBtn.addEventListener('click', () => this.exportCSV());
         this.clearBtn.addEventListener('click', () => this.clearAll());
-
-        this.render();
-
-        // Load item database first, then check for URL parameters
-        await this.loadItemDatabase();
-        this.loadPlayersFromUrl();
     }
 
     // Load the item database from bitjita.com
@@ -1526,14 +1532,9 @@ async function switchView(view) {
         // Show inventory sections
         inventorySections.forEach(section => section.style.display = '');
 
-        // Show inventory controls
-        if (viewControlsSection) {
-            viewControlsSection.style.display = '';
-        }
-
-        // Hide market controls
+        // Remove market controls if present
         if (marketControlsSection) {
-            marketControlsSection.style.display = 'none';
+            marketControlsSection.remove();
         }
 
         footer.style.display = 'flex';
@@ -1552,6 +1553,25 @@ async function switchView(view) {
                 // Replace market display with inventory display
                 inventoryDisplay.outerHTML = originalInventoryHTML.inventoryDisplay;
             }
+
+            // Restore view controls if we stored them
+            if (originalInventoryHTML.viewControls) {
+                const existingViewControls = document.querySelector('.view-controls');
+                if (!existingViewControls) {
+                    // Insert the view-controls section before the stats-bar
+                    const statsBarSection = document.querySelector('.stats-bar');
+                    if (statsBarSection) {
+                        statsBarSection.insertAdjacentHTML('beforebegin', originalInventoryHTML.viewControls);
+                    }
+                }
+            }
+
+            // Clear the stored HTML so we can capture fresh state next time
+            originalInventoryHTML = null;
+
+            // Re-setup DOM elements and event listeners after HTML restoration
+            viewer.setupDomElements();
+            viewer.setupEventListeners();
 
             // Re-render inventory
             viewer.render();
@@ -1576,14 +1596,17 @@ let originalInventoryHTML = null;
 async function renderMarketView() {
     const main = document.querySelector('main');
 
-    // Store the original inventory sections before replacing them
+    // Store the original inventory sections before replacing them (only once)
     if (!originalInventoryHTML) {
         const statsBar = document.querySelector('.stats-bar');
         const inventoryDisplay = document.querySelector('.inventory-display');
+        const viewControls = document.querySelector('.view-controls');
+
         if (statsBar && inventoryDisplay) {
             originalInventoryHTML = {
                 statsBar: statsBar.outerHTML,
-                inventoryDisplay: inventoryDisplay.outerHTML
+                inventoryDisplay: inventoryDisplay.outerHTML,
+                viewControls: viewControls ? viewControls.outerHTML : null
             };
         }
     }

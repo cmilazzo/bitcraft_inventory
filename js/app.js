@@ -1351,6 +1351,12 @@ class MarketViewer {
         console.log('Items array found:', itemsArray ? itemsArray.length : 'null');
 
         if (itemsArray) {
+            // Log first item to see structure
+            if (itemsArray.length > 0) {
+                console.log('First item in array:', itemsArray[0]);
+                console.log('Item keys:', Object.keys(itemsArray[0]));
+            }
+
             for (const item of itemsArray) {
                 if (item && typeof item === 'object' && item.name) {
                     items.push({
@@ -1467,12 +1473,19 @@ async function switchView(view) {
     window.history.pushState({}, '', url);
 
     // Show/hide appropriate sections
-    const inventorySections = document.querySelectorAll('.player-search, .active-players, .view-controls');
+    const inventorySections = document.querySelectorAll('.player-search, .active-players');
+    const viewControlsSection = document.querySelector('.view-controls');
     const footer = document.querySelector('footer');
 
     if (view === 'inventory') {
         // Show inventory sections
         inventorySections.forEach(section => section.style.display = '');
+
+        // Show view-controls only if it's the inventory controls (has filter-tier)
+        if (viewControlsSection && viewControlsSection.querySelector('#filter-tier')) {
+            viewControlsSection.style.display = '';
+        }
+
         footer.style.display = 'flex';
 
         // Restore original inventory HTML if it was replaced by market view
@@ -1495,6 +1508,12 @@ async function switchView(view) {
         }
     } else if (view === 'market') {
         inventorySections.forEach(section => section.style.display = 'none');
+
+        // Hide inventory view-controls if present
+        if (viewControlsSection && viewControlsSection.querySelector('#filter-tier')) {
+            viewControlsSection.style.display = 'none';
+        }
+
         footer.style.display = 'none';
         await renderMarketView();
     }

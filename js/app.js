@@ -1390,41 +1390,74 @@ class MarketViewer {
 
     async fetchItemPrice(itemId) {
         try {
-            // Try fetching the market orders page for this specific item
-            const response = await fetch(`${API_BASE}/market/item/${itemId}/orders/__data.json`);
+            // Try the item detail page endpoint
+            const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json`);
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
 
-            console.log(`\n=== Fetching orders for item ${itemId} ===`);
-            console.log('Decoded orders:', decoded);
+            console.log(`\n=== Fetching price for item ${itemId} ===`);
 
-            // The orders endpoint should have sellOrders and buyOrders arrays
+            // The decoded data might have orders in various places
             let sellOrders = null;
 
-            // Try to find sellOrders in the decoded structure
-            if (decoded && decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
-                sellOrders = decoded.sellOrders;
-            } else if (decoded && decoded.orders && decoded.orders.sellOrders && Array.isArray(decoded.orders.sellOrders)) {
-                sellOrders = decoded.orders.sellOrders;
-            } else if (decoded && decoded.marketOrders && decoded.marketOrders.sellOrders && Array.isArray(decoded.marketOrders.sellOrders)) {
-                sellOrders = decoded.marketOrders.sellOrders;
+            // Check all possible paths in the decoded structure
+            if (decoded) {
+                // Try direct properties
+                if (decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
+                    sellOrders = decoded.sellOrders;
+                    console.log('Found sellOrders at root level');
+                }
+                // Try nested in item object
+                else if (decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
+                    sellOrders = decoded.item.sellOrders;
+                    console.log('Found sellOrders in item object');
+                }
+                // Try nested in marketData
+                else if (decoded.marketData) {
+                    // Check if the specific item has orders
+                    if (decoded.marketData.sellOrders && Array.isArray(decoded.marketData.sellOrders)) {
+                        sellOrders = decoded.marketData.sellOrders;
+                        console.log('Found sellOrders in marketData');
+                    }
+                    // Maybe orders are attached to items
+                    else if (decoded.marketData.items && Array.isArray(decoded.marketData.items)) {
+                        // Find the specific item in the items array
+                        const item = decoded.marketData.items.find(i => i.id === String(itemId));
+                        if (item && item.orders && Array.isArray(item.orders)) {
+                            sellOrders = item.orders.filter(order => order.type === 'sell' || order.orderType === 'sell');
+                            console.log('Found orders array in specific item');
+                        }
+                    }
+                }
+                // Try orders object
+                else if (decoded.orders) {
+                    if (Array.isArray(decoded.orders.sell)) {
+                        sellOrders = decoded.orders.sell;
+                        console.log('Found sellOrders in orders.sell');
+                    } else if (Array.isArray(decoded.orders.sellOrders)) {
+                        sellOrders = decoded.orders.sellOrders;
+                        console.log('Found sellOrders in orders.sellOrders');
+                    } else if (Array.isArray(decoded.orders)) {
+                        sellOrders = decoded.orders.filter(order => order.type === 'sell' || order.orderType === 'sell');
+                        console.log('Found orders array, filtered for sell orders');
+                    }
+                }
             }
 
-            console.log(`SellOrders found for item ${itemId}:`, sellOrders);
-
-            // Extract the lowest price from sellOrders
             if (sellOrders && sellOrders.length > 0) {
-                // Log the first order to see its structure
-                console.log('First sell order:', sellOrders[0]);
+                console.log(`Found ${sellOrders.length} sell orders for item ${itemId}`);
+                console.log('First sell order structure:', sellOrders[0]);
 
                 // Try different possible property names for price
                 const prices = sellOrders
-                    .map(order => order.priceThreshold || order.price || order.pricePerUnit || order.unitPrice)
+                    .map(order => order.priceThreshold || order.price || order.pricePerUnit || order.unitPrice || order.pricePerItem)
                     .filter(price => price != null && price > 0);
 
-                const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
-                console.log(`Lowest price for item ${itemId}:`, lowestPrice);
-                return lowestPrice;
+                if (prices.length > 0) {
+                    const lowestPrice = Math.min(...prices);
+                    console.log(`Lowest price for item ${itemId}: ${lowestPrice}`);
+                    return lowestPrice;
+                }
             }
 
             console.log(`No sell orders found for item ${itemId}`);

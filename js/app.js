@@ -1330,17 +1330,25 @@ class MarketViewer {
     }
 
     extractMarketItems(data) {
-        // Market data structure: the decoded data is the items array itself or has items property
+        // Market data structure: the decoded data has a marketData property containing items
         const items = [];
+
+        console.log('Extracting from data:', data);
 
         // Try to get the items array from different possible locations
         let itemsArray = null;
 
         if (Array.isArray(data)) {
             itemsArray = data;
+        } else if (data && data.marketData && data.marketData.items && Array.isArray(data.marketData.items)) {
+            itemsArray = data.marketData.items;
         } else if (data && data.items && Array.isArray(data.items)) {
             itemsArray = data.items;
+        } else if (data && data.marketData && Array.isArray(data.marketData)) {
+            itemsArray = data.marketData;
         }
+
+        console.log('Items array found:', itemsArray ? itemsArray.length : 'null');
 
         if (itemsArray) {
             for (const item of itemsArray) {

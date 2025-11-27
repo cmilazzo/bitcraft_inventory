@@ -1395,26 +1395,26 @@ class MarketViewer {
             const decoded = viewer.decodeSvelteKitData(json);
 
             console.log(`[Item ${itemId}] Decoded:`, decoded);
-            console.log(`[Item ${itemId}] Keys:`, decoded ? Object.keys(decoded) : 'null');
 
             if (!decoded) {
                 console.log(`[Item ${itemId}] No decoded data`);
                 return null;
             }
 
-            // The decoded structure should have sellOrders directly
-            let sellOrders = decoded.sellOrders;
-            console.log(`[Item ${itemId}] sellOrders at root:`, sellOrders);
+            // The decoded structure has data nested in marketData
+            let sellOrders = null;
 
-            // If not found directly, try nested paths
-            if (!sellOrders && decoded.marketItem) {
-                sellOrders = decoded.marketItem.sellOrders;
-                console.log(`[Item ${itemId}] sellOrders in marketItem:`, sellOrders);
-            }
+            if (decoded.marketData) {
+                console.log(`[Item ${itemId}] marketData keys:`, Object.keys(decoded.marketData));
 
-            if (!sellOrders && decoded.item) {
-                sellOrders = decoded.item.sellOrders;
-                console.log(`[Item ${itemId}] sellOrders in item:`, sellOrders);
+                // Try to find sellOrders in marketData
+                if (decoded.marketData.sellOrders) {
+                    sellOrders = decoded.marketData.sellOrders;
+                } else if (decoded.marketData.item && decoded.marketData.item.sellOrders) {
+                    sellOrders = decoded.marketData.item.sellOrders;
+                } else if (decoded.marketData.marketItem && decoded.marketData.marketItem.sellOrders) {
+                    sellOrders = decoded.marketData.marketItem.sellOrders;
+                }
             }
 
             if (sellOrders && Array.isArray(sellOrders) && sellOrders.length > 0) {

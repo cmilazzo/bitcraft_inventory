@@ -1378,6 +1378,8 @@ class MarketViewer {
                         totalOrders: item.totalOrders || 0,
                         description: item.description || '',
                         price: null, // Will be fetched on demand
+                        seller: null, // Will be fetched on demand
+                        location: null, // Will be fetched on demand
                         priceLoaded: false
                     });
                 }
@@ -1445,17 +1447,26 @@ class MarketViewer {
                 console.log(`[Item ${itemId}] Found ${sellOrders.length} sell orders`);
                 console.log(`[Item ${itemId}] First order:`, sellOrders[0]);
 
-                // Extract prices from priceThreshold property
-                const prices = sellOrders
-                    .map(order => order.priceThreshold)
-                    .filter(price => price != null && price > 0);
+                // Extract prices from priceThreshold property and find the lowest
+                const ordersWithPrices = sellOrders
+                    .filter(order => order.priceThreshold != null && order.priceThreshold > 0)
+                    .map(order => ({
+                        price: order.priceThreshold,
+                        seller: order.ownerUsername || 'Unknown',
+                        location: order.regionName || 'Unknown'
+                    }))
+                    .sort((a, b) => a.price - b.price);
 
-                console.log(`[Item ${itemId}] Prices extracted:`, prices);
+                console.log(`[Item ${itemId}] Orders with prices:`, ordersWithPrices);
 
-                if (prices.length > 0) {
-                    const lowestPrice = Math.min(...prices);
-                    console.log(`[Item ${itemId}] Lowest price: ${lowestPrice}`);
-                    return lowestPrice;
+                if (ordersWithPrices.length > 0) {
+                    const cheapestOrder = ordersWithPrices[0];
+                    console.log(`[Item ${itemId}] Cheapest order:`, cheapestOrder);
+                    return {
+                        price: cheapestOrder.price,
+                        seller: cheapestOrder.seller,
+                        location: cheapestOrder.location
+                    };
                 }
             }
 
@@ -1504,7 +1515,16 @@ class MarketViewer {
             const batch = itemsNeedingPrices.slice(i, i + batchSize);
             console.log(`Fetching prices for batch ${i / batchSize + 1}, ${batch.length} items`);
             await Promise.all(batch.map(async (item) => {
-                item.price = await this.fetchItemPrice(item.id);
+                const priceData = await this.fetchItemPrice(item.id);
+                if (priceData) {
+                    item.price = priceData.price;
+                    item.seller = priceData.seller;
+                    item.location = priceData.location;
+                } else {
+                    item.price = null;
+                    item.seller = null;
+                    item.location = null;
+                }
                 item.priceLoaded = true;
             }));
         }
@@ -1908,6 +1928,8 @@ async function renderMarketTable() {
                     <th>Rarity</th>
                     <th>Tag/Type</th>
                     <th>Price</th>
+                    <th>Seller</th>
+                    <th>Location</th>
                     <th>Available</th>
                 </tr>
             </thead>
@@ -1923,6 +1945,8 @@ async function renderMarketTable() {
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
                         <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="seller-value">${item.seller || '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="location-value">${item.location || '<span class="loading-text">Loading...</span>'}</td>
                         <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
@@ -1940,8 +1964,17 @@ async function renderMarketTable() {
             const row = tbody.querySelector(`tr[data-item-id="${item.id}"]`);
             if (row) {
                 const priceCell = row.querySelector('.price-value');
+                const sellerCell = row.querySelector('.seller-value');
+                const locationCell = row.querySelector('.location-value');
+
                 if (priceCell) {
                     priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
+                }
+                if (sellerCell) {
+                    sellerCell.textContent = item.seller || 'N/A';
+                }
+                if (locationCell) {
+                    locationCell.textContent = item.location || 'N/A';
                 }
             }
         });

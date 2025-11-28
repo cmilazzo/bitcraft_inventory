@@ -127,19 +127,19 @@ class InventoryViewer {
         }
     }
 
-    // Load settings from URL parameters
+    // Load settings from URL parameters (inventory-specific)
     loadSettingsFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
 
-        // Load filter/sort settings
-        const groupBy = urlParams.get('groupBy');
-        const filterTier = urlParams.get('tier');
-        const filterRarity = urlParams.get('rarity');
-        const filterTag = urlParams.get('type');
-        const sortBy = urlParams.get('sortBy');
-        const sortOrder = urlParams.get('order');
-        const search = urlParams.get('search');
-        const expandPkg = urlParams.get('expand');
+        // Load filter/sort settings (inventory-specific parameters)
+        const groupBy = urlParams.get('inv_group');
+        const filterTier = urlParams.get('inv_tier');
+        const filterRarity = urlParams.get('inv_rarity');
+        const filterTag = urlParams.get('inv_type');
+        const sortBy = urlParams.get('inv_sort');
+        const sortOrder = urlParams.get('inv_order');
+        const search = urlParams.get('inv_search');
+        const expandPkg = urlParams.get('inv_expand');
 
         // Apply settings to dropdowns
         if (groupBy && this.groupBySelect.querySelector(`option[value="${groupBy}"]`)) {
@@ -725,79 +725,79 @@ class InventoryViewer {
         this.render();
     }
 
-    // Update URL with current player IDs and all filter/sort settings
+    // Update URL with current player IDs and all filter/sort settings (inventory-specific)
     updateUrl() {
         const entityIds = Array.from(this.players.keys());
         const url = new URL(window.location);
 
-        // Players
+        // Players (shared parameter, not view-specific)
         if (entityIds.length > 0) {
             url.searchParams.set('players', entityIds.join(','));
         } else {
             url.searchParams.delete('players');
         }
 
-        // Group By
+        // Group By (inventory-specific parameter)
         const groupBy = this.groupBySelect.value;
         if (groupBy !== 'none') {
-            url.searchParams.set('groupBy', groupBy);
+            url.searchParams.set('inv_group', groupBy);
         } else {
-            url.searchParams.delete('groupBy');
+            url.searchParams.delete('inv_group');
         }
 
-        // Filter Tier
+        // Filter Tier (inventory-specific parameter)
         const filterTier = this.filterTierSelect.value;
         if (filterTier !== 'all') {
-            url.searchParams.set('tier', filterTier);
+            url.searchParams.set('inv_tier', filterTier);
         } else {
-            url.searchParams.delete('tier');
+            url.searchParams.delete('inv_tier');
         }
 
-        // Filter Rarity
+        // Filter Rarity (inventory-specific parameter)
         const filterRarity = this.filterRaritySelect.value;
         if (filterRarity !== 'all') {
-            url.searchParams.set('rarity', filterRarity);
+            url.searchParams.set('inv_rarity', filterRarity);
         } else {
-            url.searchParams.delete('rarity');
+            url.searchParams.delete('inv_rarity');
         }
 
-        // Filter Tag/Type
+        // Filter Tag/Type (inventory-specific parameter)
         const filterTag = this.filterTagSelect.value;
         if (filterTag !== 'all') {
-            url.searchParams.set('type', filterTag);
+            url.searchParams.set('inv_type', filterTag);
         } else {
-            url.searchParams.delete('type');
+            url.searchParams.delete('inv_type');
         }
 
-        // Sort By
+        // Sort By (inventory-specific parameter)
         const sortBy = this.sortBySelect.value;
         if (sortBy !== 'name') {
-            url.searchParams.set('sortBy', sortBy);
+            url.searchParams.set('inv_sort', sortBy);
         } else {
-            url.searchParams.delete('sortBy');
+            url.searchParams.delete('inv_sort');
         }
 
-        // Sort Order
+        // Sort Order (inventory-specific parameter)
         const sortOrder = this.sortOrderSelect.value;
         if (sortOrder !== 'asc') {
-            url.searchParams.set('order', sortOrder);
+            url.searchParams.set('inv_order', sortOrder);
         } else {
-            url.searchParams.delete('order');
+            url.searchParams.delete('inv_order');
         }
 
-        // Search
+        // Search (inventory-specific parameter)
         const search = this.itemSearchInput.value.trim();
         if (search) {
-            url.searchParams.set('search', search);
+            url.searchParams.set('inv_search', search);
         } else {
-            url.searchParams.delete('search');
+            url.searchParams.delete('inv_search');
         }
 
-        // Expand Packages (default is true, so only save when false)
+        // Expand Packages (inventory-specific parameter, default is true, so only save when false)
         if (!this.expandPackages) {
-            url.searchParams.set('expand', '0');
+            url.searchParams.set('inv_expand', '0');
         } else {
-            url.searchParams.delete('expand');
+            url.searchParams.delete('inv_expand');
         }
 
         window.history.replaceState({}, '', url);
@@ -1316,31 +1316,31 @@ class MarketViewer {
     loadFromUrl() {
         const params = new URLSearchParams(window.location.search);
 
-        // Load selected tags
-        const tags = params.get('tags');
+        // Load selected tags (market-specific parameter)
+        const tags = params.get('mkt_tags');
         if (tags) {
             tags.split(',').forEach(tag => this.selectedTags.add(tag));
         }
 
-        // Load rarity filter
-        const rarity = params.get('rarity');
+        // Load rarity filter (market-specific parameter)
+        const rarity = params.get('mkt_rarity');
         if (rarity) {
             this.selectedRarity = rarity;
         }
 
-        // Load sort settings
-        const sortBy = params.get('sortBy');
+        // Load sort settings (market-specific parameters)
+        const sortBy = params.get('mkt_sort');
         if (sortBy) {
             this.sortBy = sortBy;
         }
 
-        const sortOrder = params.get('sortOrder');
+        const sortOrder = params.get('mkt_order');
         if (sortOrder) {
             this.sortOrder = sortOrder;
         }
 
-        // Load search term
-        const search = params.get('search');
+        // Load search term (market-specific parameter)
+        const search = params.get('mkt_search');
         if (search) {
             this.searchTerm = search;
         }
@@ -1349,38 +1349,38 @@ class MarketViewer {
     updateUrl() {
         const params = new URLSearchParams(window.location.search);
 
-        // Update tags
+        // Update tags (market-specific parameter)
         if (this.selectedTags.size > 0) {
-            params.set('tags', Array.from(this.selectedTags).join(','));
+            params.set('mkt_tags', Array.from(this.selectedTags).join(','));
         } else {
-            params.delete('tags');
+            params.delete('mkt_tags');
         }
 
-        // Update rarity
+        // Update rarity (market-specific parameter)
         if (this.selectedRarity !== 'all') {
-            params.set('rarity', this.selectedRarity);
+            params.set('mkt_rarity', this.selectedRarity);
         } else {
-            params.delete('rarity');
+            params.delete('mkt_rarity');
         }
 
-        // Update sort
+        // Update sort (market-specific parameters)
         if (this.sortBy !== 'name') {
-            params.set('sortBy', this.sortBy);
+            params.set('mkt_sort', this.sortBy);
         } else {
-            params.delete('sortBy');
+            params.delete('mkt_sort');
         }
 
         if (this.sortOrder !== 'asc') {
-            params.set('sortOrder', this.sortOrder);
+            params.set('mkt_order', this.sortOrder);
         } else {
-            params.delete('sortOrder');
+            params.delete('mkt_order');
         }
 
-        // Update search
+        // Update search (market-specific parameter)
         if (this.searchTerm) {
-            params.set('search', this.searchTerm);
+            params.set('mkt_search', this.searchTerm);
         } else {
-            params.delete('search');
+            params.delete('mkt_search');
         }
 
         // Update URL without reload

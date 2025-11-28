@@ -1310,6 +1310,82 @@ class MarketViewer {
         this.sortBy = 'name';
         this.sortOrder = 'asc';
         this.searchTerm = '';
+        this.loadFromUrl();
+    }
+
+    loadFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+
+        // Load selected tags
+        const tags = params.get('tags');
+        if (tags) {
+            tags.split(',').forEach(tag => this.selectedTags.add(tag));
+        }
+
+        // Load rarity filter
+        const rarity = params.get('rarity');
+        if (rarity) {
+            this.selectedRarity = rarity;
+        }
+
+        // Load sort settings
+        const sortBy = params.get('sortBy');
+        if (sortBy) {
+            this.sortBy = sortBy;
+        }
+
+        const sortOrder = params.get('sortOrder');
+        if (sortOrder) {
+            this.sortOrder = sortOrder;
+        }
+
+        // Load search term
+        const search = params.get('search');
+        if (search) {
+            this.searchTerm = search;
+        }
+    }
+
+    updateUrl() {
+        const params = new URLSearchParams(window.location.search);
+
+        // Update tags
+        if (this.selectedTags.size > 0) {
+            params.set('tags', Array.from(this.selectedTags).join(','));
+        } else {
+            params.delete('tags');
+        }
+
+        // Update rarity
+        if (this.selectedRarity !== 'all') {
+            params.set('rarity', this.selectedRarity);
+        } else {
+            params.delete('rarity');
+        }
+
+        // Update sort
+        if (this.sortBy !== 'name') {
+            params.set('sortBy', this.sortBy);
+        } else {
+            params.delete('sortBy');
+        }
+
+        if (this.sortOrder !== 'asc') {
+            params.set('sortOrder', this.sortOrder);
+        } else {
+            params.delete('sortOrder');
+        }
+
+        // Update search
+        if (this.searchTerm) {
+            params.set('search', this.searchTerm);
+        } else {
+            params.delete('search');
+        }
+
+        // Update URL without reload
+        const newUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
+        window.history.pushState({}, '', newUrl);
     }
 
     async fetchMarketData() {
@@ -1379,7 +1455,9 @@ class MarketViewer {
                         description: item.description || '',
                         price: null, // Will be fetched on demand
                         seller: null, // Will be fetched on demand
-                        location: null, // Will be fetched on demand
+                        claimName: null, // Will be fetched on demand
+                        regionName: null, // Will be fetched on demand
+                        regionId: null, // Will be fetched on demand
                         priceLoaded: false
                     });
                 }
@@ -1453,7 +1531,9 @@ class MarketViewer {
                     .map(order => ({
                         price: order.priceThreshold,
                         seller: order.ownerUsername || 'Unknown',
-                        location: order.regionName || 'Unknown'
+                        claimName: order.claimName || 'Unknown',
+                        regionName: order.regionName || 'Unknown',
+                        regionId: order.regionId || null
                     }))
                     .sort((a, b) => a.price - b.price);
 
@@ -1465,7 +1545,9 @@ class MarketViewer {
                     return {
                         price: cheapestOrder.price,
                         seller: cheapestOrder.seller,
-                        location: cheapestOrder.location
+                        claimName: cheapestOrder.claimName,
+                        regionName: cheapestOrder.regionName,
+                        regionId: cheapestOrder.regionId
                     };
                 }
             }
@@ -1519,11 +1601,15 @@ class MarketViewer {
                 if (priceData) {
                     item.price = priceData.price;
                     item.seller = priceData.seller;
-                    item.location = priceData.location;
+                    item.claimName = priceData.claimName;
+                    item.regionName = priceData.regionName;
+                    item.regionId = priceData.regionId;
                 } else {
                     item.price = null;
                     item.seller = null;
-                    item.location = null;
+                    item.claimName = null;
+                    item.regionName = null;
+                    item.regionId = null;
                 }
                 item.priceLoaded = true;
             }));
@@ -1549,9 +1635,14 @@ class MarketViewer {
         // Filter by selected tags (multi-select)
         let filtered = this.items.filter(item => this.selectedTags.has(item.tag));
 
-        // Filter by rarity
+        // Filter by rarity (selected rarity or above)
         if (this.selectedRarity !== 'all') {
-            filtered = filtered.filter(item => item.rarity === this.selectedRarity);
+            const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
+            const selectedRarityLevel = rarityOrder[this.selectedRarity] || 0;
+            filtered = filtered.filter(item => {
+                const itemRarityLevel = rarityOrder[item.rarity] || 0;
+                return itemRarityLevel >= selectedRarityLevel;
+            });
         }
 
         // Filter by search term
@@ -1781,14 +1872,14 @@ async function renderMarketView() {
                             <div id="tag-filter-container" class="tag-filter-container"></div>
                         </div>
                         <div class="control-group">
-                            <label>Rarity:</label>
+                            <label>Rarity (or above):</label>
                             <select id="market-rarity-filter">
                                 <option value="all">All Rarities</option>
-                                <option value="Common">Common</option>
-                                <option value="Uncommon">Uncommon</option>
-                                <option value="Rare">Rare</option>
-                                <option value="Epic">Epic</option>
-                                <option value="Legendary">Legendary</option>
+                                <option value="Common">Common+</option>
+                                <option value="Uncommon">Uncommon+</option>
+                                <option value="Rare">Rare+</option>
+                                <option value="Epic">Epic+</option>
+                                <option value="Legendary">Legendary+</option>
                                 <option value="Mythic">Mythic</option>
                             </select>
                         </div>
@@ -1848,13 +1939,19 @@ function renderTagFilters(tags) {
     }
     container.innerHTML = tags.map(tag => `
         <label class="tag-filter-item">
-            <input type="checkbox" value="${tag}" class="tag-checkbox">
+            <input type="checkbox" value="${tag}" class="tag-checkbox" ${marketViewer.selectedTags.has(tag) ? 'checked' : ''}>
             <span>${tag}</span>
         </label>
     `).join('');
 }
 
 function setupMarketEventListeners() {
+    // Apply URL parameters to UI controls
+    document.getElementById('market-rarity-filter').value = marketViewer.selectedRarity;
+    document.getElementById('market-sort-by').value = marketViewer.sortBy;
+    document.getElementById('market-sort-order').value = marketViewer.sortOrder;
+    document.getElementById('market-search').value = marketViewer.searchTerm;
+
     // Tag checkboxes
     document.querySelectorAll('.tag-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', (e) => {
@@ -1863,6 +1960,7 @@ function setupMarketEventListeners() {
             } else {
                 marketViewer.selectedTags.delete(e.target.value);
             }
+            marketViewer.updateUrl();
             renderMarketTable();
         });
     });
@@ -1870,23 +1968,27 @@ function setupMarketEventListeners() {
     // Rarity filter
     document.getElementById('market-rarity-filter').addEventListener('change', (e) => {
         marketViewer.selectedRarity = e.target.value;
+        marketViewer.updateUrl();
         renderMarketTable();
     });
 
     // Sort controls
     document.getElementById('market-sort-by').addEventListener('change', (e) => {
         marketViewer.sortBy = e.target.value;
+        marketViewer.updateUrl();
         renderMarketTable();
     });
 
     document.getElementById('market-sort-order').addEventListener('change', (e) => {
         marketViewer.sortOrder = e.target.value;
+        marketViewer.updateUrl();
         renderMarketTable();
     });
 
     // Search
     document.getElementById('market-search').addEventListener('input', (e) => {
         marketViewer.searchTerm = e.target.value;
+        marketViewer.updateUrl();
         renderMarketTable();
     });
 }
@@ -1918,19 +2020,27 @@ async function renderMarketTable() {
         return;
     }
 
+    // Helper function to get sort indicator
+    const getSortIndicator = (columnName) => {
+        if (marketViewer.sortBy === columnName) {
+            return marketViewer.sortOrder === 'asc' ? ' ▲' : ' ▼';
+        }
+        return '';
+    };
+
     // Render initial table with loading state for prices
     content.innerHTML = `
         <table class="inventory-table">
             <thead>
                 <tr>
-                    <th>Item</th>
-                    <th>Tier</th>
-                    <th>Rarity</th>
+                    <th class="sortable-header" data-sort="name" style="cursor: pointer;">Item${getSortIndicator('name')}</th>
+                    <th class="sortable-header" data-sort="tier" style="cursor: pointer;">Tier${getSortIndicator('tier')}</th>
+                    <th class="sortable-header" data-sort="rarity" style="cursor: pointer;">Rarity${getSortIndicator('rarity')}</th>
                     <th>Tag/Type</th>
-                    <th>Price</th>
+                    <th class="sortable-header" data-sort="price" style="cursor: pointer;">Price${getSortIndicator('price')}</th>
                     <th>Seller</th>
                     <th>Location</th>
-                    <th>Available</th>
+                    <th class="sortable-header" data-sort="quantity" style="cursor: pointer;">Available${getSortIndicator('quantity')}</th>
                 </tr>
             </thead>
             <tbody id="market-table-body">
@@ -1946,13 +2056,34 @@ async function renderMarketTable() {
                         <td>${escapeHtml(item.tag)}</td>
                         <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="seller-value">${item.seller || '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="location-value">${item.location || '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="location-value">
+                            ${item.priceLoaded ? (item.claimName ? `<div style="text-align: center;"><div style="font-weight: 600;">${escapeHtml(item.claimName)}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}</div></div>` : 'N/A') : '<span class="loading-text">Loading...</span>'}
+                        </td>
                         <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
             </tbody>
         </table>
     `;
+
+    // Add click handlers to sortable headers
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const sortColumn = header.dataset.sort;
+            // Toggle order if clicking the same column, otherwise default to ascending
+            if (marketViewer.sortBy === sortColumn) {
+                marketViewer.sortOrder = marketViewer.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                marketViewer.sortBy = sortColumn;
+                marketViewer.sortOrder = 'asc';
+            }
+            marketViewer.updateUrl();
+            // Update UI controls to match
+            document.getElementById('market-sort-by').value = marketViewer.sortBy;
+            document.getElementById('market-sort-order').value = marketViewer.sortOrder;
+            renderMarketTable();
+        });
+    });
 
     // Load prices asynchronously
     await marketViewer.loadPricesForVisibleItems(items);
@@ -1974,7 +2105,11 @@ async function renderMarketTable() {
                     sellerCell.textContent = item.seller || 'N/A';
                 }
                 if (locationCell) {
-                    locationCell.textContent = item.location || 'N/A';
+                    if (item.claimName) {
+                        locationCell.innerHTML = `<div style="text-align: center;"><div style="font-weight: 600;">${escapeHtml(item.claimName)}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}</div></div>`;
+                    } else {
+                        locationCell.textContent = 'N/A';
+                    }
                 }
             }
         });

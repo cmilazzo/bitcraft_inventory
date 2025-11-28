@@ -9,34 +9,51 @@
 </head>
 <body>
     <header>
-        <h1>Bitcraft Inventory Viewer</h1>
-        <p class="subtitle">View and aggregate player inventories</p>
+        <div class="header-content">
+            <div class="header-left">
+                <h1>Bitcraft Inventory Viewer</h1>
+                <nav class="header-nav">
+                    <a href="#" class="nav-link active" data-view="inventory">Inventory</a>
+                    <a href="#" class="nav-link" data-view="market">Market</a>
+                </nav>
+            </div>
+        </div>
     </header>
 
-    <nav class="view-navigation">
-        <button class="nav-tab active" data-view="inventory">Inventory</button>
-        <button class="nav-tab" data-view="market">Market</button>
-    </nav>
-
     <main>
-        <section class="player-search">
-            <h2>Add Player</h2>
-            <div class="search-box">
+        <section class="player-management">
+            <div class="player-search-inline">
+                <label>Add Player:</label>
                 <input type="text" id="player-search" placeholder="Enter player name..." autocomplete="off">
                 <button id="search-btn">Search</button>
             </div>
             <div id="search-results" class="search-results"></div>
-        </section>
-
-        <section class="active-players">
-            <h2>Active Players</h2>
-            <div id="player-list" class="player-chips">
-                <p class="empty-state">No players added yet. Search for a player above.</p>
+            <div class="active-players-inline">
+                <label>Active Players:</label>
+                <div id="player-list" class="player-chips">
+                    <p class="empty-state">No players added yet.</p>
+                </div>
             </div>
         </section>
 
         <section class="view-controls">
-            <h2>View Options</h2>
+            <div class="controls-header">
+                <h2>Filters & Options</h2>
+                <div class="stats-inline">
+                    <div class="stat-inline">
+                        <span class="stat-value" id="stat-players">0</span>
+                        <span class="stat-label">Players</span>
+                    </div>
+                    <div class="stat-inline">
+                        <span class="stat-value" id="stat-unique">0</span>
+                        <span class="stat-label">Unique</span>
+                    </div>
+                    <div class="stat-inline">
+                        <span class="stat-value" id="stat-total">0</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                </div>
+            </div>
             <div class="controls-row">
                 <div class="control-group">
                     <label>Group By:</label>
@@ -109,21 +126,6 @@
                         Expand Packages
                     </label>
                 </div>
-            </div>
-        </section>
-
-        <section class="stats-bar">
-            <div class="stat">
-                <span class="stat-value" id="stat-players">0</span>
-                <span class="stat-label">Players</span>
-            </div>
-            <div class="stat">
-                <span class="stat-value" id="stat-unique">0</span>
-                <span class="stat-label">Unique Items</span>
-            </div>
-            <div class="stat">
-                <span class="stat-value" id="stat-total">0</span>
-                <span class="stat-label">Total Count</span>
             </div>
         </section>
 

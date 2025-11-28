@@ -1684,11 +1684,12 @@ const marketViewer = new MarketViewer();
 
 // View Navigation Setup
 function setupNavigation() {
-    const navTabs = document.querySelectorAll('.nav-tab');
+    const navLinks = document.querySelectorAll('.nav-link');
 
-    navTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const view = tab.dataset.view;
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const view = link.dataset.view;
             switchView(view);
         });
     });
@@ -1704,9 +1705,9 @@ function setupNavigation() {
 async function switchView(view) {
     currentView = view;
 
-    // Update active tab
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.view === view);
+    // Update active link
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.toggle('active', link.dataset.view === view);
     });
 
     // Update URL without reload
@@ -1715,14 +1716,14 @@ async function switchView(view) {
     window.history.pushState({}, '', url);
 
     // Show/hide appropriate sections
-    const inventorySections = document.querySelectorAll('.player-search, .active-players');
+    const playerManagement = document.querySelector('.player-management');
     const viewControlsSection = document.querySelector('.view-controls');
     const marketControlsSection = document.querySelector('.market-controls');
     const footer = document.querySelector('footer');
 
     if (view === 'inventory') {
         // Show inventory sections
-        inventorySections.forEach(section => section.style.display = '');
+        if (playerManagement) playerManagement.style.display = '';
 
         // Remove market controls if present
         if (marketControlsSection) {
@@ -1738,13 +1739,6 @@ async function switchView(view) {
 
         // Restore original inventory HTML if it was replaced by market view
         if (originalInventoryHTML) {
-            const statsBar = document.querySelector('.stats-bar');
-
-            if (statsBar && statsBar.querySelector('#market-stat-total')) {
-                // Replace market stats with inventory stats
-                statsBar.outerHTML = originalInventoryHTML.statsBar;
-            }
-
             const inventoryDisplay = document.querySelector('.inventory-display');
             if (inventoryDisplay && inventoryDisplay.querySelector('#market-content')) {
                 // Replace market display with inventory display
@@ -1755,10 +1749,10 @@ async function switchView(view) {
             if (originalInventoryHTML.viewControls) {
                 const existingViewControls = document.querySelector('.view-controls');
                 if (!existingViewControls) {
-                    // Insert the view-controls section before the stats-bar
-                    const statsBarSection = document.querySelector('.stats-bar');
-                    if (statsBarSection) {
-                        statsBarSection.insertAdjacentHTML('beforebegin', originalInventoryHTML.viewControls);
+                    // Insert the view-controls section
+                    const inventoryDisplaySection = document.querySelector('.inventory-display');
+                    if (inventoryDisplaySection) {
+                        inventoryDisplaySection.insertAdjacentHTML('beforebegin', originalInventoryHTML.viewControls);
                     }
                 }
             }
@@ -1774,7 +1768,7 @@ async function switchView(view) {
             viewer.render();
         }
     } else if (view === 'market') {
-        inventorySections.forEach(section => section.style.display = 'none');
+        if (playerManagement) playerManagement.style.display = 'none';
 
         // Hide inventory controls
         if (viewControlsSection) {
@@ -1815,13 +1809,11 @@ async function renderMarketView() {
 
     // Store the original inventory sections before replacing them (only once)
     if (!originalInventoryHTML) {
-        const statsBar = document.querySelector('.stats-bar');
         const inventoryDisplay = document.querySelector('.inventory-display');
         const viewControls = document.querySelector('.view-controls');
 
-        if (statsBar && inventoryDisplay) {
+        if (inventoryDisplay) {
             originalInventoryHTML = {
-                statsBar: statsBar.outerHTML,
                 inventoryDisplay: inventoryDisplay.outerHTML,
                 viewControls: viewControls ? viewControls.outerHTML : null
             };
@@ -1839,33 +1831,29 @@ async function renderMarketView() {
 
         const tags = marketViewer.getAvailableTags();
 
-        // Find and replace stats bar and inventory display sections
-        const statsBar = document.querySelector('.stats-bar');
+        // Find and replace inventory display section
         const inventoryDisplay = document.querySelector('.inventory-display');
-
-        if (statsBar && !statsBar.querySelector('#market-stat-total')) {
-            statsBar.outerHTML = `
-                <section class="stats-bar">
-                    <div class="stat">
-                        <span class="stat-value" id="market-stat-total">0</span>
-                        <span class="stat-label">Total Items</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="market-stat-filtered">0</span>
-                        <span class="stat-label">Filtered Items</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="market-stat-available">0</span>
-                        <span class="stat-label">Available</span>
-                    </div>
-                </section>
-            `;
-        }
 
         if (inventoryDisplay && !document.querySelector('.market-controls')) {
             inventoryDisplay.outerHTML = `
                 <section class="market-controls">
-                    <h2>Market Filters</h2>
+                    <div class="controls-header">
+                        <h2>Market Filters</h2>
+                        <div class="stats-inline">
+                            <div class="stat-inline">
+                                <span class="stat-value" id="market-stat-total">0</span>
+                                <span class="stat-label">Total</span>
+                            </div>
+                            <div class="stat-inline">
+                                <span class="stat-value" id="market-stat-filtered">0</span>
+                                <span class="stat-label">Filtered</span>
+                            </div>
+                            <div class="stat-inline">
+                                <span class="stat-value" id="market-stat-available">0</span>
+                                <span class="stat-label">Available</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="controls-row">
                         <div class="control-group">
                             <label>Tags/Types (Multi-select):</label>

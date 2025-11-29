@@ -1632,7 +1632,16 @@ class MarketViewer {
             'Empty Bucket',
             'Banking Kit',
             'Automata Heart',
-            'Ancient Component'
+            'Ancient Component',
+            'Sap',
+            'Tool Bundle',
+            'Stick',
+            'Hexite Capsule',
+            'Construction Material',
+            'Coins',
+            'Food Waste',
+            'Hex Coin Sack',
+            'Schematic Fragments'
         ]);
 
         const tags = new Set();

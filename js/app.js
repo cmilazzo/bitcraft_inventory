@@ -1854,11 +1854,17 @@ async function renderMarketView() {
                             </div>
                         </div>
                     </div>
-                    <div class="controls-row">
-                        <div class="control-group">
-                            <label>Tags/Types (Multi-select):</label>
-                            <div id="tag-filter-container" class="tag-filter-container"></div>
+                    <div class="tag-filter-section">
+                        <div class="tag-filter-header">
+                            <label>Item Types:</label>
+                            <div class="tag-filter-actions">
+                                <button type="button" id="select-all-tags" class="tag-action-btn">Select All</button>
+                                <button type="button" id="clear-all-tags" class="tag-action-btn">Clear All</button>
+                            </div>
                         </div>
+                        <div id="tag-filter-container" class="tag-pill-container"></div>
+                    </div>
+                    <div class="controls-row">
                         <div class="control-group">
                             <label>Rarity (or above):</label>
                             <select id="market-rarity-filter">
@@ -1926,10 +1932,9 @@ function renderTagFilters(tags) {
         return;
     }
     container.innerHTML = tags.map(tag => `
-        <label class="tag-filter-item">
-            <input type="checkbox" value="${tag}" class="tag-checkbox" ${marketViewer.selectedTags.has(tag) ? 'checked' : ''}>
-            <span>${tag}</span>
-        </label>
+        <button type="button" class="tag-pill ${marketViewer.selectedTags.has(tag) ? 'active' : ''}" data-tag="${tag}">
+            ${tag}
+        </button>
     `).join('');
 }
 
@@ -1940,18 +1945,48 @@ function setupMarketEventListeners() {
     document.getElementById('market-sort-order').value = marketViewer.sortOrder;
     document.getElementById('market-search').value = marketViewer.searchTerm;
 
-    // Tag checkboxes
-    document.querySelectorAll('.tag-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                marketViewer.selectedTags.add(e.target.value);
+    // Tag pill buttons
+    document.querySelectorAll('.tag-pill').forEach(pill => {
+        pill.addEventListener('click', (e) => {
+            const tag = e.currentTarget.dataset.tag;
+            if (marketViewer.selectedTags.has(tag)) {
+                marketViewer.selectedTags.delete(tag);
+                e.currentTarget.classList.remove('active');
             } else {
-                marketViewer.selectedTags.delete(e.target.value);
+                marketViewer.selectedTags.add(tag);
+                e.currentTarget.classList.add('active');
             }
             marketViewer.updateUrl();
             renderMarketTable();
         });
     });
+
+    // Select All button
+    const selectAllBtn = document.getElementById('select-all-tags');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+            const allTags = marketViewer.getAvailableTags();
+            allTags.forEach(tag => marketViewer.selectedTags.add(tag));
+            document.querySelectorAll('.tag-pill').forEach(pill => {
+                pill.classList.add('active');
+            });
+            marketViewer.updateUrl();
+            renderMarketTable();
+        });
+    }
+
+    // Clear All button
+    const clearAllBtn = document.getElementById('clear-all-tags');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+            marketViewer.selectedTags.clear();
+            document.querySelectorAll('.tag-pill').forEach(pill => {
+                pill.classList.remove('active');
+            });
+            marketViewer.updateUrl();
+            renderMarketTable();
+        });
+    }
 
     // Rarity filter
     document.getElementById('market-rarity-filter').addEventListener('change', (e) => {

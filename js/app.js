@@ -1617,9 +1617,27 @@ class MarketViewer {
     }
 
     getAvailableTags() {
+        // Tags to exclude from the filter (not useful for market browsing)
+        const excludedTags = new Set([
+            'Seasonal',
+            'Taming Items',
+            'Writ',
+            'Trader License',
+            'Water',
+            'Settlement Foundation Kit',
+            'Sugar',
+            'Salt',
+            'Pitch',
+            'Flint',
+            'Empty Bucket',
+            'Banking Kit',
+            'Automata Heart',
+            'Ancient Component'
+        ]);
+
         const tags = new Set();
         this.items.forEach(item => {
-            if (item.tag && item.tag !== 'Unknown') {
+            if (item.tag && item.tag !== 'Unknown' && !excludedTags.has(item.tag)) {
                 tags.add(item.tag);
             }
         });

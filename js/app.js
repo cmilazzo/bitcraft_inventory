@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0001';
+const VERSION = '1.0002';
 
 // Current view state
 let currentView = 'inventory';
@@ -377,12 +377,11 @@ class InventoryViewer {
 
         const items = [];
 
-        // Structure: decoded.inventories = { inventories: [...containers], items: {...}, cargos: {...} }
-        if (decoded.inventories && typeof decoded.inventories === 'object') {
-            const invData = decoded.inventories;
-            const containers = invData.inventories || [];
-            const itemsLookup = invData.items || {};
-            const cargosLookup = invData.cargos || {};
+        // Structure: decoded = { inventories: [...containers], items: {...}, cargos: {...} }
+        if (decoded && decoded.inventories) {
+            const containers = Array.isArray(decoded.inventories) ? decoded.inventories : [];
+            const itemsLookup = decoded.items || {};
+            const cargosLookup = decoded.cargos || {};
 
             // Containers to skip (equipped items, not actual inventory)
             const skipContainers = new Set(['Wallet', 'Toolbelt']);

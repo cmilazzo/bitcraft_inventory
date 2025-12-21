@@ -101,6 +101,14 @@ header h1 {
     background: rgba(59, 130, 246, 0.1);
 }
 
+.version-display {
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    opacity: 0.6;
+    user-select: none;
+}
+
 /* Main content */
 main {
     max-width: 1600px;

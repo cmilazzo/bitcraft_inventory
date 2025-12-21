@@ -2,6 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
+const VERSION = '1.0001';
 
 // Current view state
 let currentView = 'inventory';
@@ -2174,3 +2175,6 @@ function escapeHtml(text) {
 
 // Initialize navigation
 setupNavigation();
+
+// Display version
+document.getElementById('version-display').textContent = VERSION;

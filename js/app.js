@@ -365,7 +365,7 @@ class InventoryViewer {
 
     async fetchPlayerInventory(entityId) {
         const response = await fetch(
-            `${API_BASE}/players/${entityId}/__data.json?x-sveltekit-invalidated=01`
+            `${API_BASE}/players/${entityId}/inventory/__data.json?x-sveltekit-invalidated=001`
         );
         const json = await response.json();
         const decoded = this.decodeSvelteKitData(json);

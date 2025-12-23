@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0002';
+const VERSION = '1.0003';
 
 // Current view state
 let currentView = 'inventory';
@@ -2156,7 +2156,8 @@ async function renderMarketTable() {
                 }
                 if (locationCell) {
                     if (item.claimName) {
-                        locationCell.innerHTML = `<div style="text-align: center;"><div style="font-weight: 600;">${escapeHtml(item.claimName)}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}</div></div>`;
+                        const regionInfo = item.regionName ? ` - ${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : '';
+                        locationCell.innerHTML = `<span style="font-weight: 500;">${escapeHtml(item.claimName)}</span><span style="font-size: 0.75rem; color: var(--text-muted);">${regionInfo}</span>`;
                     } else {
                         locationCell.textContent = 'N/A';
                     }

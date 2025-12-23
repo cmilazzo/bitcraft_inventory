@@ -762,7 +762,7 @@ section h2 {
 
 .inventory-table th {
     text-align: left;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     background: var(--bg-card);
     font-weight: 600;
     font-size: 0.6875rem;
@@ -776,11 +776,11 @@ section h2 {
 }
 
 .inventory-table td {
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     border-bottom: 1px solid var(--border-subtle);
     font-size: 0.8125rem;
-    vertical-align: top;
-    line-height: 1.6;
+    vertical-align: middle;
+    line-height: 1.3;
 }
 
 .inventory-table tbody tr:last-child td {

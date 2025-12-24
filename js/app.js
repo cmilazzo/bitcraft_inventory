@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0004';
+const VERSION = '1.0005';
 
 // Current view state
 let currentView = 'inventory';
@@ -1864,10 +1864,10 @@ async function renderMarketView() {
         if (inventoryDisplay && !document.querySelector('.market-controls')) {
             inventoryDisplay.outerHTML = `
                 <section class="market-controls">
-                    <div class="controls-header">
+                    <div class="controls-header" data-collapse-target="market-controls">
                         <div style="display: flex; align-items: center;">
                             <h2>Market Filters</h2>
-                            <button class="collapse-btn" data-collapse-target="market-controls"></button>
+                            <span class="collapse-indicator"></span>
                         </div>
                         <div class="stats-inline">
                             <div class="stat-inline">
@@ -2183,16 +2183,24 @@ setupNavigation();
 document.getElementById('version-display').textContent = VERSION;
 
 // Setup collapse functionality
-function setupCollapseButtons() {
-    document.querySelectorAll('.collapse-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const targetClass = btn.dataset.collapseTarget;
+function setupCollapseHeaders() {
+    // Remove any existing listeners to prevent duplicates
+    const headers = document.querySelectorAll('[data-collapse-target]');
+
+    headers.forEach(header => {
+        // Clone and replace to remove old listeners
+        const newHeader = header.cloneNode(true);
+        header.parentNode.replaceChild(newHeader, header);
+    });
+
+    // Add click listeners to all collapsible headers
+    document.querySelectorAll('[data-collapse-target]').forEach(header => {
+        header.addEventListener('click', () => {
+            const targetClass = header.dataset.collapseTarget;
             const section = document.querySelector('.' + targetClass);
 
             if (section) {
                 section.classList.toggle('collapsed');
-                btn.classList.toggle('collapsed');
 
                 // Save collapse state to localStorage
                 const isCollapsed = section.classList.contains('collapsed');
@@ -2204,23 +2212,21 @@ function setupCollapseButtons() {
     // Restore collapse states from localStorage
     ['player-management', 'view-controls', 'market-controls'].forEach(sectionClass => {
         const section = document.querySelector('.' + sectionClass);
-        const btn = document.querySelector(`[data-collapse-target="${sectionClass}"]`);
         const isCollapsed = localStorage.getItem(`collapse-${sectionClass}`) === 'true';
 
-        if (section && btn && isCollapsed) {
+        if (section && isCollapsed) {
             section.classList.add('collapsed');
-            btn.classList.add('collapsed');
         }
     });
 }
 
 // Initial setup
-setupCollapseButtons();
+setupCollapseHeaders();
 
-// Re-setup collapse buttons when switching to market view
+// Re-setup collapse headers when switching to market view
 // (since market controls are dynamically created)
 const originalRenderMarketView = renderMarketView;
 window.renderMarketView = async function() {
     await originalRenderMarketView();
-    setupCollapseButtons();
+    setupCollapseHeaders();
 };

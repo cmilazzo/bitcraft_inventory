@@ -23,6 +23,10 @@
 
     <main>
         <section class="player-management">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Players</span>
+                <button class="collapse-btn" data-collapse-target="player-management"></button>
+            </div>
             <div class="player-search-inline">
                 <label>Add Player:</label>
                 <input type="text" id="player-search" placeholder="Enter player name..." autocomplete="off">
@@ -39,7 +43,10 @@
 
         <section class="view-controls">
             <div class="controls-header">
-                <h2>Filters & Options</h2>
+                <div style="display: flex; align-items: center;">
+                    <h2>Filters & Options</h2>
+                    <button class="collapse-btn" data-collapse-target="view-controls"></button>
+                </div>
                 <div class="stats-inline">
                     <div class="stat-inline">
                         <span class="stat-value" id="stat-players">0</span>

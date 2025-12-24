@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0003';
+const VERSION = '1.0004';
 
 // Current view state
 let currentView = 'inventory';
@@ -1865,7 +1865,10 @@ async function renderMarketView() {
             inventoryDisplay.outerHTML = `
                 <section class="market-controls">
                     <div class="controls-header">
-                        <h2>Market Filters</h2>
+                        <div style="display: flex; align-items: center;">
+                            <h2>Market Filters</h2>
+                            <button class="collapse-btn" data-collapse-target="market-controls"></button>
+                        </div>
                         <div class="stats-inline">
                             <div class="stat-inline">
                                 <span class="stat-value" id="market-stat-total">0</span>
@@ -2178,3 +2181,46 @@ setupNavigation();
 
 // Display version
 document.getElementById('version-display').textContent = VERSION;
+
+// Setup collapse functionality
+function setupCollapseButtons() {
+    document.querySelectorAll('.collapse-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetClass = btn.dataset.collapseTarget;
+            const section = document.querySelector('.' + targetClass);
+
+            if (section) {
+                section.classList.toggle('collapsed');
+                btn.classList.toggle('collapsed');
+
+                // Save collapse state to localStorage
+                const isCollapsed = section.classList.contains('collapsed');
+                localStorage.setItem(`collapse-${targetClass}`, isCollapsed);
+            }
+        });
+    });
+
+    // Restore collapse states from localStorage
+    ['player-management', 'view-controls', 'market-controls'].forEach(sectionClass => {
+        const section = document.querySelector('.' + sectionClass);
+        const btn = document.querySelector(`[data-collapse-target="${sectionClass}"]`);
+        const isCollapsed = localStorage.getItem(`collapse-${sectionClass}`) === 'true';
+
+        if (section && btn && isCollapsed) {
+            section.classList.add('collapsed');
+            btn.classList.add('collapsed');
+        }
+    });
+}
+
+// Initial setup
+setupCollapseButtons();
+
+// Re-setup collapse buttons when switching to market view
+// (since market controls are dynamically created)
+const originalRenderMarketView = renderMarketView;
+window.renderMarketView = async function() {
+    await originalRenderMarketView();
+    setupCollapseButtons();
+};

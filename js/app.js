@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0005';
+const VERSION = '1.0006';
 
 // Current view state
 let currentView = 'inventory';
@@ -1867,7 +1867,6 @@ async function renderMarketView() {
                     <div class="controls-header" data-collapse-target="market-controls">
                         <div style="display: flex; align-items: center;">
                             <h2>Market Filters</h2>
-                            <span class="collapse-indicator"></span>
                         </div>
                         <div class="stats-inline">
                             <div class="stat-inline">

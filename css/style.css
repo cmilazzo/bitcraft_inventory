@@ -379,11 +379,12 @@ section h2 {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.625rem;
     cursor: pointer;
     user-select: none;
-    padding: 0.25rem;
-    margin: -0.25rem;
+    padding: 0.25rem 0.5rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
     border-radius: 6px;
     transition: background 0.2s;
 }
@@ -411,18 +412,7 @@ section h2 {
 }
 
 .collapse-indicator {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-left: 0.5rem;
-    transition: transform 0.2s;
-}
-
-.collapse-indicator::before {
-    content: '▲';
-}
-
-.collapsed .collapse-indicator {
-    transform: rotate(180deg);
+    display: none;
 }
 
 .stats-inline {

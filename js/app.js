@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0009';
+const VERSION = '1.0010';
 
 // Current view state
 let currentView = 'inventory';
@@ -1732,7 +1732,7 @@ class PlayerMarketViewer {
 
     async fetchPlayerMarketData(playerId) {
         const response = await fetch(
-            `${API_BASE}/market/player/${playerId}`
+            `${API_BASE}/api/market/player/${playerId}`
         );
 
         if (!response.ok) {

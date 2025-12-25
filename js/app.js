@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0006';
+const VERSION = '1.0009';
 
 // Current view state
 let currentView = 'inventory';
@@ -355,7 +355,13 @@ class InventoryViewer {
             const items = await this.fetchPlayerInventory(entityId);
             this.players.set(entityId, { username, items });
             this.updateUrl();
-            this.render();
+
+            // If we're in player-market view, load that player's market data
+            if (currentView === 'player-market') {
+                await loadPlayerMarketData(entityId);
+            } else {
+                this.render();
+            }
         } catch (error) {
             console.error('Error fetching inventory:', error);
             alert(`Error loading inventory for ${username}.`);
@@ -1044,13 +1050,20 @@ class InventoryViewer {
             return;
         }
 
-        this.playerList.innerHTML = Array.from(this.players.entries()).map(([entityId, data]) => `
-            <div class="player-chip">
-                <span>${this.escapeHtml(data.username)}</span>
-                <span>(${data.items.length} items)</span>
-                <button class="remove-btn" onclick="viewer.removePlayer('${entityId}')">&times;</button>
-            </div>
-        `).join('');
+        const isPlayerMarketView = currentView === 'player-market';
+        const selectedPlayerId = playerMarketViewer.selectedPlayer?.id;
+
+        this.playerList.innerHTML = Array.from(this.players.entries()).map(([entityId, data]) => {
+            const isSelected = isPlayerMarketView && selectedPlayerId === entityId;
+            return `
+                <div class="player-chip ${isSelected ? 'selected' : ''}"
+                     ${isPlayerMarketView ? `style="cursor: pointer;" onclick="loadPlayerMarketData('${entityId}')"` : ''}>
+                    <span>${this.escapeHtml(data.username)}</span>
+                    <span>(${data.items.length} items)</span>
+                    <button class="remove-btn" onclick="event.stopPropagation(); viewer.removePlayer('${entityId}')">&times;</button>
+                </div>
+            `;
+        }).join('');
     }
 
     renderInventory() {
@@ -1709,6 +1722,81 @@ class MarketViewer {
 const viewer = new InventoryViewer();
 const marketViewer = new MarketViewer();
 
+// Player Market Viewer Class
+class PlayerMarketViewer {
+    constructor() {
+        this.selectedPlayer = null;
+        this.sellOrders = [];
+        this.buyOrders = [];
+    }
+
+    async fetchPlayerMarketData(playerId) {
+        const response = await fetch(
+            `${API_BASE}/market/player/${playerId}`
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch market data: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data) {
+            throw new Error('No market data returned');
+        }
+
+        // Store player info
+        this.selectedPlayer = {
+            id: data.playerId,
+            username: data.playerUsername
+        };
+
+        // Parse sell orders and buy orders
+        this.parseSellOrders(data.sellOrders || []);
+        this.parseBuyOrders(data.buyOrders || []);
+
+        return data;
+    }
+
+    parseSellOrders(sellOrders) {
+        this.sellOrders = sellOrders.map(order => ({
+            entityId: order.entityId,
+            itemId: order.itemId,
+            itemName: order.itemName || 'Unknown',
+            itemTier: order.itemTier,
+            itemRarity: order.itemRarityStr || 'Common',
+            itemTag: order.itemTag,
+            quantity: parseInt(order.quantity) || 0,
+            price: parseInt(order.priceThreshold) || 0,
+            claimName: order.claimName,
+            claimLocationX: order.claimLocationX,
+            claimLocationZ: order.claimLocationZ,
+            regionName: order.regionName,
+            regionId: order.regionId
+        }));
+    }
+
+    parseBuyOrders(buyOrders) {
+        this.buyOrders = buyOrders.map(order => ({
+            entityId: order.entityId,
+            itemId: order.itemId,
+            itemName: order.itemName || 'Unknown',
+            itemTier: order.itemTier,
+            itemRarity: order.itemRarityStr || 'Common',
+            itemTag: order.itemTag,
+            quantity: parseInt(order.quantity) || 0,
+            price: parseInt(order.priceThreshold) || 0,
+            claimName: order.claimName,
+            claimLocationX: order.claimLocationX,
+            claimLocationZ: order.claimLocationZ,
+            regionName: order.regionName,
+            regionId: order.regionId
+        }));
+    }
+}
+
+const playerMarketViewer = new PlayerMarketViewer();
+
 // View Navigation Setup
 function setupNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
@@ -1724,7 +1812,7 @@ function setupNavigation() {
     // Load view from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get('view');
-    if (viewParam && (viewParam === 'inventory' || viewParam === 'market')) {
+    if (viewParam && (viewParam === 'inventory' || viewParam === 'market' || viewParam === 'player-market')) {
         switchView(viewParam);
     }
 }
@@ -1805,6 +1893,22 @@ async function switchView(view) {
         // Market controls will be shown by renderMarketView
         footer.style.display = 'none';
         await renderMarketView();
+    } else if (view === 'player-market') {
+        // Show player management for player selection
+        if (playerManagement) playerManagement.style.display = '';
+
+        // Hide inventory controls
+        if (viewControlsSection) {
+            viewControlsSection.style.display = 'none';
+        }
+
+        // Remove market controls if present
+        if (marketControlsSection) {
+            marketControlsSection.remove();
+        }
+
+        footer.style.display = 'none';
+        await renderPlayerMarketView();
     }
 }
 
@@ -1952,6 +2056,125 @@ async function renderMarketView() {
     } finally {
         document.getElementById('loading-overlay').classList.add('hidden');
     }
+}
+
+// Player Market View Rendering
+async function renderPlayerMarketView() {
+    const inventoryDisplay = document.querySelector('.inventory-display');
+
+    if (!inventoryDisplay) {
+        console.error('Inventory display section not found');
+        return;
+    }
+
+    // Replace content with player market view
+    inventoryDisplay.innerHTML = `
+        <div id="player-market-content" style="background: var(--bg-secondary); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-subtle); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);">
+            <p style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                Select a player from above to view their market orders.
+            </p>
+        </div>
+    `;
+
+    // If there are already players loaded, render for the first one
+    if (viewer.players.size > 0) {
+        const firstPlayerId = viewer.players.keys().next().value;
+        await loadPlayerMarketData(firstPlayerId);
+    }
+}
+
+async function loadPlayerMarketData(playerId) {
+    document.getElementById('loading-overlay').classList.remove('hidden');
+
+    try {
+        // Fetch player market data - this also sets playerMarketViewer.selectedPlayer
+        await playerMarketViewer.fetchPlayerMarketData(playerId);
+
+        // Update player list to show selected state
+        viewer.renderPlayerList();
+
+        // Render the market orders
+        renderPlayerMarketOrders();
+    } catch (error) {
+        console.error('Error loading player market data:', error);
+        const content = document.getElementById('player-market-content');
+        if (content) {
+            content.innerHTML = `<p class="error-message">Error loading market data: ${error.message}</p>`;
+        }
+    } finally {
+        document.getElementById('loading-overlay').classList.add('hidden');
+    }
+}
+
+function renderPlayerMarketOrders() {
+    const content = document.getElementById('player-market-content');
+    if (!content) return;
+
+    const player = playerMarketViewer.selectedPlayer;
+    const sellOrders = playerMarketViewer.sellOrders;
+    const buyOrders = playerMarketViewer.buyOrders;
+
+    content.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                Market Orders for ${escapeHtml(player.username)}
+            </h2>
+        </div>
+
+        <!-- Sell Orders Section -->
+        <div style="margin-bottom: 2rem;">
+            <div class="section-header" style="margin-bottom: 0.75rem;">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">
+                    Sell Orders (${sellOrders.length})
+                </h3>
+            </div>
+            ${sellOrders.length > 0 ? renderOrdersTable(sellOrders, 'sell') : '<p style="color: var(--text-muted); padding: 1rem; text-align: center;">No sell orders</p>'}
+        </div>
+
+        <!-- Buy Orders Section -->
+        <div>
+            <div class="section-header" style="margin-bottom: 0.75rem;">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">
+                    Buy Orders (${buyOrders.length})
+                </h3>
+            </div>
+            ${buyOrders.length > 0 ? renderOrdersTable(buyOrders, 'buy') : '<p style="color: var(--text-muted); padding: 1rem; text-align: center;">No buy orders</p>'}
+        </div>
+    `;
+}
+
+function renderOrdersTable(orders, type) {
+    return `
+        <table class="inventory-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Tier</th>
+                    <th>Rarity</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total Value</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${orders.map(order => {
+                    const rarity = (order.itemRarity || 'common').toLowerCase();
+                    return `
+                        <tr class="rarity-row-${rarity}">
+                            <td class="item-name">${escapeHtml(order.itemName)}</td>
+                            <td><span class="tier-badge">T${order.itemTier}</span></td>
+                            <td><span class="rarity-${rarity}">${order.itemRarity || 'Common'}</span></td>
+                            <td>${order.quantity.toLocaleString()}</td>
+                            <td>${order.price.toLocaleString()}</td>
+                            <td style="font-weight: 500;">${(order.quantity * order.price).toLocaleString()}</td>
+                            <td>${order.claimName ? `<span style="font-weight: 500;">${escapeHtml(order.claimName)}</span>${order.regionName ? `<span style="font-size: 0.75rem; color: var(--text-muted);"> - ${escapeHtml(order.regionName)}</span>` : ''}` : 'N/A'}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
 }
 
 function renderTagFilters(tags) {

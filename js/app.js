@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0010';
+const VERSION = '1.0011';
 
 // Current view state
 let currentView = 'inventory';
@@ -1728,6 +1728,8 @@ class PlayerMarketViewer {
         this.selectedPlayer = null;
         this.sellOrders = [];
         this.buyOrders = [];
+        this.sellOrdersSort = { column: 'itemName', direction: 'asc' };
+        this.buyOrdersSort = { column: 'itemName', direction: 'asc' };
     }
 
     async fetchPlayerMarketData(playerId) {
@@ -1793,6 +1795,56 @@ class PlayerMarketViewer {
             regionId: order.regionId
         }));
     }
+
+    sortOrders(orders, column, direction) {
+        return [...orders].sort((a, b) => {
+            let aVal = a[column];
+            let bVal = b[column];
+
+            // Handle tier sorting
+            if (column === 'itemTier') {
+                aVal = parseInt(aVal);
+                bVal = parseInt(bVal);
+            }
+
+            // Handle rarity sorting
+            if (column === 'itemRarity') {
+                const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
+                aVal = rarityOrder[aVal] || 0;
+                bVal = rarityOrder[bVal] || 0;
+            }
+
+            // Handle numeric columns
+            if (column === 'quantity' || column === 'price') {
+                aVal = parseInt(aVal) || 0;
+                bVal = parseInt(bVal) || 0;
+            }
+
+            // Handle total value
+            if (column === 'totalValue') {
+                aVal = a.quantity * a.price;
+                bVal = b.quantity * b.price;
+            }
+
+            // String comparison
+            if (typeof aVal === 'string' && typeof bVal === 'string') {
+                return direction === 'asc'
+                    ? aVal.localeCompare(bVal)
+                    : bVal.localeCompare(aVal);
+            }
+
+            // Numeric comparison
+            return direction === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+    }
+
+    getSortedSellOrders() {
+        return this.sortOrders(this.sellOrders, this.sellOrdersSort.column, this.sellOrdersSort.direction);
+    }
+
+    getSortedBuyOrders() {
+        return this.sortOrders(this.buyOrders, this.buyOrdersSort.column, this.buyOrdersSort.direction);
+    }
 }
 
 const playerMarketViewer = new PlayerMarketViewer();
@@ -1852,10 +1904,14 @@ async function switchView(view) {
 
         footer.style.display = 'flex';
 
+        // Check if we need to restore inventory view from player-market or market
+        const inventoryDisplay = document.querySelector('.inventory-display');
+        const hasPlayerMarketContent = inventoryDisplay && inventoryDisplay.querySelector('#player-market-content');
+        const hasMarketContent = inventoryDisplay && inventoryDisplay.querySelector('#market-content');
+
         // Restore original inventory HTML if it was replaced by market view
         if (originalInventoryHTML) {
-            const inventoryDisplay = document.querySelector('.inventory-display');
-            if (inventoryDisplay && inventoryDisplay.querySelector('#market-content')) {
+            if (inventoryDisplay && hasMarketContent) {
                 // Replace market display with inventory display
                 inventoryDisplay.outerHTML = originalInventoryHTML.inventoryDisplay;
             }
@@ -1880,6 +1936,10 @@ async function switchView(view) {
             viewer.setupEventListeners();
 
             // Re-render inventory
+            viewer.render();
+        } else if (hasPlayerMarketContent) {
+            // Coming from player-market view, just re-render inventory
+            viewer.setupDomElements();
             viewer.render();
         }
     } else if (view === 'market') {
@@ -2111,8 +2171,8 @@ function renderPlayerMarketOrders() {
     if (!content) return;
 
     const player = playerMarketViewer.selectedPlayer;
-    const sellOrders = playerMarketViewer.sellOrders;
-    const buyOrders = playerMarketViewer.buyOrders;
+    const sellOrders = playerMarketViewer.getSortedSellOrders();
+    const buyOrders = playerMarketViewer.getSortedBuyOrders();
 
     content.innerHTML = `
         <div style="margin-bottom: 1.5rem;">
@@ -2125,36 +2185,48 @@ function renderPlayerMarketOrders() {
         <div style="margin-bottom: 2rem;">
             <div class="section-header" style="margin-bottom: 0.75rem;">
                 <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">
-                    Sell Orders (${sellOrders.length})
+                    Sell Orders (${playerMarketViewer.sellOrders.length})
                 </h3>
             </div>
-            ${sellOrders.length > 0 ? renderOrdersTable(sellOrders, 'sell') : '<p style="color: var(--text-muted); padding: 1rem; text-align: center;">No sell orders</p>'}
+            ${playerMarketViewer.sellOrders.length > 0 ? renderOrdersTable(sellOrders, 'sell') : '<p style="color: var(--text-muted); padding: 1rem; text-align: center;">No sell orders</p>'}
         </div>
 
         <!-- Buy Orders Section -->
         <div>
             <div class="section-header" style="margin-bottom: 0.75rem;">
                 <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">
-                    Buy Orders (${buyOrders.length})
+                    Buy Orders (${playerMarketViewer.buyOrders.length})
                 </h3>
             </div>
-            ${buyOrders.length > 0 ? renderOrdersTable(buyOrders, 'buy') : '<p style="color: var(--text-muted); padding: 1rem; text-align: center;">No buy orders</p>'}
+            ${playerMarketViewer.buyOrders.length > 0 ? renderOrdersTable(buyOrders, 'buy') : '<p style="color: var(--text-muted); padding: 1rem; text-align: center;">No buy orders</p>'}
         </div>
     `;
+
+    // Setup sort handlers after rendering
+    setupPlayerMarketSortHandlers();
 }
 
 function renderOrdersTable(orders, type) {
+    const sortState = type === 'sell' ? playerMarketViewer.sellOrdersSort : playerMarketViewer.buyOrdersSort;
+
+    const getSortIndicator = (column) => {
+        if (sortState.column === column) {
+            return sortState.direction === 'asc' ? ' ▲' : ' ▼';
+        }
+        return '';
+    };
+
     return `
         <table class="inventory-table">
             <thead>
                 <tr>
-                    <th>Item</th>
-                    <th>Tier</th>
-                    <th>Rarity</th>
-                    <th>Quantity</th>
-                    <th>Price</th>
-                    <th>Total Value</th>
-                    <th>Location</th>
+                    <th class="sortable-header" data-sort="itemName" data-type="${type}" style="cursor: pointer;">Item${getSortIndicator('itemName')}</th>
+                    <th class="sortable-header" data-sort="itemTier" data-type="${type}" style="cursor: pointer;">Tier${getSortIndicator('itemTier')}</th>
+                    <th class="sortable-header" data-sort="itemRarity" data-type="${type}" style="cursor: pointer;">Rarity${getSortIndicator('itemRarity')}</th>
+                    <th class="sortable-header" data-sort="quantity" data-type="${type}" style="cursor: pointer;">Quantity${getSortIndicator('quantity')}</th>
+                    <th class="sortable-header" data-sort="price" data-type="${type}" style="cursor: pointer;">Price${getSortIndicator('price')}</th>
+                    <th class="sortable-header" data-sort="totalValue" data-type="${type}" style="cursor: pointer;">Total Value${getSortIndicator('totalValue')}</th>
+                    <th class="sortable-header" data-sort="claimName" data-type="${type}" style="cursor: pointer;">Location${getSortIndicator('claimName')}</th>
                 </tr>
             </thead>
             <tbody>
@@ -2175,6 +2247,27 @@ function renderOrdersTable(orders, type) {
             </tbody>
         </table>
     `;
+}
+
+function setupPlayerMarketSortHandlers() {
+    document.querySelectorAll('.sortable-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            const type = header.dataset.type;
+            const sortState = type === 'sell' ? playerMarketViewer.sellOrdersSort : playerMarketViewer.buyOrdersSort;
+
+            // Toggle direction if same column, otherwise reset to ascending
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+
+            // Re-render the orders
+            renderPlayerMarketOrders();
+        });
+    });
 }
 
 function renderTagFilters(tags) {

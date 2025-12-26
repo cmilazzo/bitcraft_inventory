@@ -1129,6 +1129,203 @@ footer button:active {
     border: 1px solid var(--danger);
 }
 
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(9, 9, 11, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal.active {
+    display: flex;
+    opacity: 1;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-30px) scale(0.95);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+    border-radius: 16px 16px 0 0;
+}
+
+.modal-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+.modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body h4 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 1rem 0 0.5rem 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.modal-body h4:first-child {
+    margin-top: 0;
+}
+
+.market-order {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.75rem;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.market-order:hover {
+    background: var(--bg-hover);
+}
+
+.market-order.player-order {
+    border: 2px solid var(--accent);
+    background: rgba(59, 130, 246, 0.08);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.market-order.cheaper {
+    border-left: 3px solid var(--danger);
+}
+
+.market-order.more-expensive {
+    border-left: 3px solid var(--success);
+}
+
+.market-order-seller {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.market-order-quantity {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: right;
+}
+
+.market-order-price {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.market-order.cheaper .market-order-price {
+    color: var(--danger);
+}
+
+.market-order.more-expensive .market-order-price {
+    color: var(--success);
+}
+
+.market-section-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.market-section-label.cheaper-section {
+    color: var(--danger);
+}
+
+.market-section-label.expensive-section {
+    color: var(--success);
+}
+
+.market-section-label.player-section {
+    color: var(--accent);
+}
+
+/* Clickable market rows */
+.market-row-clickable {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.market-row-clickable:hover {
+    background: var(--bg-hover) !important;
+    transform: translateX(3px);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     main {

@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0011';
+const VERSION = '1.0012';
 
 // Current view state
 let currentView = 'inventory';
@@ -1730,6 +1730,41 @@ class PlayerMarketViewer {
         this.buyOrders = [];
         this.sellOrdersSort = { column: 'itemName', direction: 'asc' };
         this.buyOrdersSort = { column: 'itemName', direction: 'asc' };
+        this.cheapestCache = {}; // Cache to store cheapest price for each item
+    }
+
+    async fetchMarketDetailsForItem(itemId) {
+        const response = await fetch(
+            `${API_BASE}/api/market/item/${itemId}`
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch market details: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
+    }
+
+    isPlayerCheapestSeller(order) {
+        const playerId = this.selectedPlayer?.id;
+        if (!playerId) return false;
+
+        // Check cache first
+        const cacheKey = order.itemId;
+        if (this.cheapestCache[cacheKey]) {
+            return this.cheapestCache[cacheKey].playerId === playerId &&
+                   this.cheapestCache[cacheKey].price === order.price;
+        }
+
+        return false;
+    }
+
+    updateCheapestCache(itemId, cheapestPrice, cheapestPlayerId) {
+        this.cheapestCache[itemId] = {
+            price: cheapestPrice,
+            playerId: cheapestPlayerId
+        };
     }
 
     async fetchPlayerMarketData(playerId) {
@@ -1774,8 +1809,57 @@ class PlayerMarketViewer {
             claimLocationX: order.claimLocationX,
             claimLocationZ: order.claimLocationZ,
             regionName: order.regionName,
-            regionId: order.regionId
+            regionId: order.regionId,
+            isCheapest: null // Will be determined when market data is fetched
         }));
+
+        // Calculate cheapest for each unique item
+        this.calculateCheapestOrders();
+    }
+
+    async calculateCheapestOrders() {
+        // Group orders by item ID to find cheapest price for each
+        const itemGroups = {};
+
+        for (const order of this.sellOrders) {
+            if (!itemGroups[order.itemId]) {
+                itemGroups[order.itemId] = [];
+            }
+            itemGroups[order.itemId].push(order);
+        }
+
+        // For each item, fetch market data to determine if player has cheapest
+        for (const itemId of Object.keys(itemGroups)) {
+            try {
+                const marketData = await this.fetchMarketDetailsForItem(itemId);
+                const allSellOrders = marketData.sellOrders || [];
+
+                // Find the cheapest price across all sellers
+                let cheapestPrice = Infinity;
+                let cheapestOwnerId = null;
+
+                for (const sellOrder of allSellOrders) {
+                    const price = parseInt(sellOrder.priceThreshold) || 0;
+                    if (price < cheapestPrice) {
+                        cheapestPrice = price;
+                        cheapestOwnerId = sellOrder.ownerEntityId;
+                    }
+                }
+
+                // Update the isCheapest flag for player's orders
+                for (const order of itemGroups[itemId]) {
+                    order.isCheapest = order.price === cheapestPrice;
+                }
+
+                // Cache the result
+                this.updateCheapestCache(itemId, cheapestPrice, cheapestOwnerId);
+            } catch (error) {
+                console.error(`Failed to fetch market data for item ${itemId}:`, error);
+            }
+        }
+
+        // Re-render after calculating
+        renderPlayerMarketOrders();
     }
 
     parseBuyOrders(buyOrders) {
@@ -2208,6 +2292,7 @@ function renderPlayerMarketOrders() {
 
 function renderOrdersTable(orders, type) {
     const sortState = type === 'sell' ? playerMarketViewer.sellOrdersSort : playerMarketViewer.buyOrdersSort;
+    const isSellOrders = type === 'sell';
 
     const getSortIndicator = (column) => {
         if (sortState.column === column) {
@@ -2226,20 +2311,27 @@ function renderOrdersTable(orders, type) {
                     <th class="sortable-header" data-sort="quantity" data-type="${type}" style="cursor: pointer;">Quantity${getSortIndicator('quantity')}</th>
                     <th class="sortable-header" data-sort="price" data-type="${type}" style="cursor: pointer;">Price${getSortIndicator('price')}</th>
                     <th class="sortable-header" data-sort="totalValue" data-type="${type}" style="cursor: pointer;">Total Value${getSortIndicator('totalValue')}</th>
+                    ${isSellOrders ? '<th>Cheapest?</th>' : ''}
                     <th class="sortable-header" data-sort="claimName" data-type="${type}" style="cursor: pointer;">Location${getSortIndicator('claimName')}</th>
                 </tr>
             </thead>
             <tbody>
                 ${orders.map(order => {
                     const rarity = (order.itemRarity || 'common').toLowerCase();
+                    const cheapestIndicator = isSellOrders && order.isCheapest !== null
+                        ? (order.isCheapest ? '<span style="color: #22c55e; font-weight: 600;">✓</span>' : '<span style="color: var(--text-muted);">✗</span>')
+                        : (isSellOrders ? '<span style="color: var(--text-muted);">...</span>' : '');
+
                     return `
-                        <tr class="rarity-row-${rarity}">
+                        <tr class="rarity-row-${rarity} ${isSellOrders ? 'market-row-clickable' : ''}"
+                            ${isSellOrders ? `onclick="showMarketDetails(${order.itemId})" style="cursor: pointer;"` : ''}>
                             <td class="item-name">${escapeHtml(order.itemName)}</td>
                             <td><span class="tier-badge">T${order.itemTier}</span></td>
                             <td><span class="rarity-${rarity}">${order.itemRarity || 'Common'}</span></td>
                             <td>${order.quantity.toLocaleString()}</td>
                             <td>${order.price.toLocaleString()}</td>
                             <td style="font-weight: 500;">${(order.quantity * order.price).toLocaleString()}</td>
+                            ${isSellOrders ? `<td style="text-align: center;">${cheapestIndicator}</td>` : ''}
                             <td>${order.claimName ? `<span style="font-weight: 500;">${escapeHtml(order.claimName)}</span>${order.regionName ? `<span style="font-size: 0.75rem; color: var(--text-muted);"> - ${escapeHtml(order.regionName)}</span>` : ''}` : 'N/A'}</td>
                         </tr>
                     `;
@@ -2268,6 +2360,124 @@ function setupPlayerMarketSortHandlers() {
             renderPlayerMarketOrders();
         });
     });
+}
+
+// Market Details Modal
+async function showMarketDetails(itemId) {
+    // Show loading overlay
+    document.getElementById('loading-overlay').classList.remove('hidden');
+
+    try {
+        const marketData = await playerMarketViewer.fetchMarketDetailsForItem(itemId);
+        const playerOrder = playerMarketViewer.sellOrders.find(o => o.itemId === itemId);
+
+        if (!playerOrder) {
+            throw new Error('Player order not found');
+        }
+
+        // Get all sell orders sorted by price
+        const allSellOrders = (marketData.sellOrders || []).map(order => ({
+            ...order,
+            price: parseInt(order.priceThreshold) || 0,
+            quantity: parseInt(order.quantity) || 0,
+            isPlayer: order.ownerEntityId === playerMarketViewer.selectedPlayer?.id
+        })).sort((a, b) => a.price - b.price);
+
+        // Find player's order index
+        const playerOrderIndex = allSellOrders.findIndex(o => o.isPlayer && o.price === playerOrder.price);
+
+        // Get 5 cheaper and 5 more expensive
+        const cheaperOrders = playerOrderIndex > 0
+            ? allSellOrders.slice(Math.max(0, playerOrderIndex - 5), playerOrderIndex)
+            : [];
+
+        const moreExpensiveOrders = playerOrderIndex < allSellOrders.length - 1
+            ? allSellOrders.slice(playerOrderIndex + 1, Math.min(allSellOrders.length, playerOrderIndex + 6))
+            : [];
+
+        // Render the modal
+        renderMarketDetailsModal(marketData.item, playerOrder, cheaperOrders, moreExpensiveOrders, allSellOrders[playerOrderIndex]);
+    } catch (error) {
+        console.error('Error loading market details:', error);
+        alert(`Failed to load market details: ${error.message}`);
+    } finally {
+        document.getElementById('loading-overlay').classList.add('hidden');
+    }
+}
+
+function renderMarketDetailsModal(item, playerOrder, cheaperOrders, moreExpensiveOrders, currentOrder) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('market-details-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'market-details-modal';
+        modal.className = 'modal';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>${escapeHtml(playerOrder.itemName)} - Market Comparison</h2>
+                <button class="modal-close" onclick="closeMarketDetailsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem;">Your Order</h3>
+                    <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 8px; border: 2px solid var(--accent);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Price: <strong>${playerOrder.price.toLocaleString()}</strong></span>
+                            <span>Quantity: <strong>${playerOrder.quantity.toLocaleString()}</strong></span>
+                            <span>Total: <strong>${(playerOrder.price * playerOrder.quantity).toLocaleString()}</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                ${cheaperOrders.length > 0 ? `
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #ef4444; margin-bottom: 0.75rem;">Cheaper Orders (${cheaperOrders.length})</h3>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            ${cheaperOrders.map(order => `
+                                <div style="background: var(--bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; border-left: 3px solid #ef4444;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                                        <span>Price: <strong>${order.price.toLocaleString()}</strong></span>
+                                        <span>Qty: ${order.quantity.toLocaleString()}</span>
+                                        <span style="color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(order.ownerUsername || 'Unknown')}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : '<p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem;">✓ You have the cheapest price!</p>'}
+
+                ${moreExpensiveOrders.length > 0 ? `
+                    <div>
+                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #22c55e; margin-bottom: 0.75rem;">More Expensive Orders (${moreExpensiveOrders.length})</h3>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            ${moreExpensiveOrders.map(order => `
+                                <div style="background: var(--bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; border-left: 3px solid #22c55e;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                                        <span>Price: <strong>${order.price.toLocaleString()}</strong></span>
+                                        <span>Qty: ${order.quantity.toLocaleString()}</span>
+                                        <span style="color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(order.ownerUsername || 'Unknown')}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+}
+
+function closeMarketDetailsModal() {
+    const modal = document.getElementById('market-details-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 function renderTagFilters(tags) {

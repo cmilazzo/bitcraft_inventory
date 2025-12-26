@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0013';
+const VERSION = '1.0014';
 
 // Current view state
 let currentView = 'inventory';
@@ -2480,13 +2480,14 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, moreExpensiv
         </div>
     `;
 
-    modal.style.display = 'flex';
+    // Show modal with active class for CSS transitions
+    modal.classList.add('active');
 }
 
 function closeMarketDetailsModal() {
     const modal = document.getElementById('market-details-modal');
     if (modal) {
-        modal.style.display = 'none';
+        modal.classList.remove('active');
     }
 }
 

@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0012';
+const VERSION = '1.0013';
 
 // Current view state
 let currentView = 'inventory';
@@ -1733,10 +1733,18 @@ class PlayerMarketViewer {
         this.cheapestCache = {}; // Cache to store cheapest price for each item
     }
 
-    async fetchMarketDetailsForItem(itemId) {
-        const response = await fetch(
+    async fetchMarketDetailsForItem(itemId, itemTag) {
+        // Try 'item' first, fallback to 'cargo' if 404
+        let response = await fetch(
             `${API_BASE}/api/market/item/${itemId}`
         );
+
+        if (response.status === 404) {
+            // Try cargo instead
+            response = await fetch(
+                `${API_BASE}/api/market/cargo/${itemId}`
+            );
+        }
 
         if (!response.ok) {
             throw new Error(`Failed to fetch market details: ${response.status}`);
@@ -1831,7 +1839,8 @@ class PlayerMarketViewer {
         // For each item, fetch market data to determine if player has cheapest
         for (const itemId of Object.keys(itemGroups)) {
             try {
-                const marketData = await this.fetchMarketDetailsForItem(itemId);
+                const itemTag = itemGroups[itemId][0]?.itemTag;
+                const marketData = await this.fetchMarketDetailsForItem(itemId, itemTag);
                 const allSellOrders = marketData.sellOrders || [];
 
                 // Find the cheapest price across all sellers
@@ -2368,12 +2377,13 @@ async function showMarketDetails(itemId) {
     document.getElementById('loading-overlay').classList.remove('hidden');
 
     try {
-        const marketData = await playerMarketViewer.fetchMarketDetailsForItem(itemId);
         const playerOrder = playerMarketViewer.sellOrders.find(o => o.itemId === itemId);
 
         if (!playerOrder) {
             throw new Error('Player order not found');
         }
+
+        const marketData = await playerMarketViewer.fetchMarketDetailsForItem(itemId, playerOrder.itemTag);
 
         // Get all sell orders sorted by price
         const allSellOrders = (marketData.sellOrders || []).map(order => ({

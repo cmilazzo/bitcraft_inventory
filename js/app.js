@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0014';
+const VERSION = '1.0015';
 
 // Current view state
 let currentView = 'inventory';
@@ -2428,53 +2428,37 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, moreExpensiv
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h2>${escapeHtml(playerOrder.itemName)} - Market Comparison</h2>
+                <h3>${escapeHtml(playerOrder.itemName)} - Market Comparison</h3>
                 <button class="modal-close" onclick="closeMarketDetailsModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom: 1.5rem;">
-                    <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem;">Your Order</h3>
-                    <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 8px; border: 2px solid var(--accent);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>Price: <strong>${playerOrder.price.toLocaleString()}</strong></span>
-                            <span>Quantity: <strong>${playerOrder.quantity.toLocaleString()}</strong></span>
-                            <span>Total: <strong>${(playerOrder.price * playerOrder.quantity).toLocaleString()}</strong></span>
-                        </div>
-                    </div>
+                <div class="market-section-label player-section">Your Order</div>
+                <div class="market-order player-order">
+                    <div class="market-order-seller">You</div>
+                    <div class="market-order-quantity">Qty: ${playerOrder.quantity.toLocaleString()}</div>
+                    <div class="market-order-price">${playerOrder.price.toLocaleString()}</div>
                 </div>
 
                 ${cheaperOrders.length > 0 ? `
-                    <div style="margin-bottom: 1.5rem;">
-                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #ef4444; margin-bottom: 0.75rem;">Cheaper Orders (${cheaperOrders.length})</h3>
-                        <div style="max-height: 200px; overflow-y: auto;">
-                            ${cheaperOrders.map(order => `
-                                <div style="background: var(--bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; border-left: 3px solid #ef4444;">
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
-                                        <span>Price: <strong>${order.price.toLocaleString()}</strong></span>
-                                        <span>Qty: ${order.quantity.toLocaleString()}</span>
-                                        <span style="color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(order.ownerUsername || 'Unknown')}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
+                    <div class="market-section-label cheaper-section" style="margin-top: 1rem;">Cheaper Orders (${cheaperOrders.length})</div>
+                    ${cheaperOrders.map(order => `
+                        <div class="market-order cheaper">
+                            <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
+                            <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
+                            <div class="market-order-price">${order.price.toLocaleString()}</div>
                         </div>
-                    </div>
-                ` : '<p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem;">✓ You have the cheapest price!</p>'}
+                    `).join('')}
+                ` : '<p style="color: var(--success); font-size: 0.75rem; margin-top: 1rem; font-weight: 500;">✓ You have the cheapest price!</p>'}
 
                 ${moreExpensiveOrders.length > 0 ? `
-                    <div>
-                        <h3 style="font-size: 0.875rem; font-weight: 600; color: #22c55e; margin-bottom: 0.75rem;">More Expensive Orders (${moreExpensiveOrders.length})</h3>
-                        <div style="max-height: 200px; overflow-y: auto;">
-                            ${moreExpensiveOrders.map(order => `
-                                <div style="background: var(--bg-card); padding: 0.5rem 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; border-left: 3px solid #22c55e;">
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
-                                        <span>Price: <strong>${order.price.toLocaleString()}</strong></span>
-                                        <span>Qty: ${order.quantity.toLocaleString()}</span>
-                                        <span style="color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(order.ownerUsername || 'Unknown')}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
+                    <div class="market-section-label expensive-section" style="margin-top: 1rem;">More Expensive Orders (${moreExpensiveOrders.length})</div>
+                    ${moreExpensiveOrders.map(order => `
+                        <div class="market-order more-expensive">
+                            <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
+                            <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
+                            <div class="market-order-price">${order.price.toLocaleString()}</div>
                         </div>
-                    </div>
+                    `).join('')}
                 ` : ''}
             </div>
         </div>

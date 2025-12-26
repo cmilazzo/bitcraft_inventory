@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0015';
+const VERSION = '1.0016';
 
 // Current view state
 let currentView = 'inventory';
@@ -2393,20 +2393,22 @@ async function showMarketDetails(itemId) {
             isPlayer: order.ownerEntityId === playerMarketViewer.selectedPlayer?.id
         })).sort((a, b) => a.price - b.price);
 
-        // Find player's order index
-        const playerOrderIndex = allSellOrders.findIndex(o => o.isPlayer && o.price === playerOrder.price);
+        const playerPrice = playerOrder.price;
 
-        // Get 5 cheaper and 5 more expensive
-        const cheaperOrders = playerOrderIndex > 0
-            ? allSellOrders.slice(Math.max(0, playerOrderIndex - 5), playerOrderIndex)
-            : [];
+        // Separate into cheaper, same price, and more expensive
+        const cheaperOrders = allSellOrders
+            .filter(o => o.price < playerPrice)
+            .slice(-5); // Take last 5 (closest to player's price)
 
-        const moreExpensiveOrders = playerOrderIndex < allSellOrders.length - 1
-            ? allSellOrders.slice(playerOrderIndex + 1, Math.min(allSellOrders.length, playerOrderIndex + 6))
-            : [];
+        const samePriceOrders = allSellOrders
+            .filter(o => o.price === playerPrice && !o.isPlayer);
+
+        const moreExpensiveOrders = allSellOrders
+            .filter(o => o.price > playerPrice)
+            .slice(0, 5); // Take first 5 (closest to player's price)
 
         // Render the modal
-        renderMarketDetailsModal(marketData.item, playerOrder, cheaperOrders, moreExpensiveOrders, allSellOrders[playerOrderIndex]);
+        renderMarketDetailsModal(marketData.item, playerOrder, cheaperOrders, samePriceOrders, moreExpensiveOrders);
     } catch (error) {
         console.error('Error loading market details:', error);
         alert(`Failed to load market details: ${error.message}`);
@@ -2415,7 +2417,7 @@ async function showMarketDetails(itemId) {
     }
 }
 
-function renderMarketDetailsModal(item, playerOrder, cheaperOrders, moreExpensiveOrders, currentOrder) {
+function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrders, moreExpensiveOrders) {
     // Create modal if it doesn't exist
     let modal = document.getElementById('market-details-modal');
     if (!modal) {
@@ -2438,6 +2440,17 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, moreExpensiv
                     <div class="market-order-quantity">Qty: ${playerOrder.quantity.toLocaleString()}</div>
                     <div class="market-order-price">${playerOrder.price.toLocaleString()}</div>
                 </div>
+
+                ${samePriceOrders.length > 0 ? `
+                    <div class="market-section-label" style="margin-top: 1rem; color: var(--warning);">Same Price (${samePriceOrders.length})</div>
+                    ${samePriceOrders.map(order => `
+                        <div class="market-order" style="border-left: 3px solid var(--warning);">
+                            <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
+                            <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
+                            <div class="market-order-price" style="color: var(--warning);">${order.price.toLocaleString()}</div>
+                        </div>
+                    `).join('')}
+                ` : ''}
 
                 ${cheaperOrders.length > 0 ? `
                     <div class="market-section-label cheaper-section" style="margin-top: 1rem;">Cheaper Orders (${cheaperOrders.length})</div>

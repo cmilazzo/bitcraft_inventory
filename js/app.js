@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0016';
+const VERSION = '1.0017';
 
 // Current view state
 let currentView = 'inventory';
@@ -2390,6 +2390,8 @@ async function showMarketDetails(itemId) {
             ...order,
             price: parseInt(order.priceThreshold) || 0,
             quantity: parseInt(order.quantity) || 0,
+            claimName: order.claimName || '',
+            regionName: order.regionName || '',
             isPlayer: order.ownerEntityId === playerMarketViewer.selectedPlayer?.id
         })).sort((a, b) => a.price - b.price);
 
@@ -2428,7 +2430,7 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
     }
 
     modal.innerHTML = `
-        <div class="modal-content">
+        <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <h3>${escapeHtml(playerOrder.itemName)} - Market Comparison</h3>
                 <button class="modal-close" onclick="closeMarketDetailsModal()">&times;</button>
@@ -2437,6 +2439,7 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                 <div class="market-section-label player-section">Your Order</div>
                 <div class="market-order player-order">
                     <div class="market-order-seller">You</div>
+                    <div class="market-order-location">${escapeHtml(playerOrder.claimName || playerOrder.regionName || 'Unknown')}</div>
                     <div class="market-order-quantity">Qty: ${playerOrder.quantity.toLocaleString()}</div>
                     <div class="market-order-price">${playerOrder.price.toLocaleString()}</div>
                 </div>
@@ -2446,6 +2449,7 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                     ${samePriceOrders.map(order => `
                         <div class="market-order" style="border-left: 3px solid var(--warning);">
                             <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
+                            <div class="market-order-location">${escapeHtml(order.claimName || order.regionName || 'Unknown')}</div>
                             <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
                             <div class="market-order-price" style="color: var(--warning);">${order.price.toLocaleString()}</div>
                         </div>
@@ -2457,6 +2461,7 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                     ${cheaperOrders.map(order => `
                         <div class="market-order cheaper">
                             <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
+                            <div class="market-order-location">${escapeHtml(order.claimName || order.regionName || 'Unknown')}</div>
                             <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
                             <div class="market-order-price">${order.price.toLocaleString()}</div>
                         </div>
@@ -2468,6 +2473,7 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                     ${moreExpensiveOrders.map(order => `
                         <div class="market-order more-expensive">
                             <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
+                            <div class="market-order-location">${escapeHtml(order.claimName || order.regionName || 'Unknown')}</div>
                             <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
                             <div class="market-order-price">${order.price.toLocaleString()}</div>
                         </div>
@@ -2479,12 +2485,16 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
 
     // Show modal with active class for CSS transitions
     modal.classList.add('active');
+
+    // Add click outside to close
+    modal.onclick = closeMarketDetailsModal;
 }
 
 function closeMarketDetailsModal() {
     const modal = document.getElementById('market-details-modal');
     if (modal) {
         modal.classList.remove('active');
+        modal.onclick = null;
     }
 }
 

@@ -1239,7 +1239,7 @@ footer button:active {
     padding: 0.5rem 0.625rem;
     margin-bottom: 0.375rem;
     display: grid;
-    grid-template-columns: 1fr 1fr 90px 90px;
+    grid-template-columns: 1fr 90px 90px 1fr;
     gap: 0.5rem;
     align-items: center;
     transition: all 0.2s;

@@ -2,7 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const VERSION = '1.0017';
+const VERSION = '1.0018';
 
 // Current view state
 let currentView = 'inventory';
@@ -2439,9 +2439,9 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                 <div class="market-section-label player-section">Your Order</div>
                 <div class="market-order player-order">
                     <div class="market-order-seller">You</div>
-                    <div class="market-order-location">${escapeHtml(playerOrder.claimName || playerOrder.regionName || 'Unknown')}</div>
                     <div class="market-order-quantity">Qty: ${playerOrder.quantity.toLocaleString()}</div>
                     <div class="market-order-price">${playerOrder.price.toLocaleString()}</div>
+                    <div class="market-order-location">${playerOrder.claimName ? `<span style="font-weight: 500;">${escapeHtml(playerOrder.claimName)}</span>${playerOrder.regionName ? `<span style="color: var(--text-muted);"> - ${escapeHtml(playerOrder.regionName)}</span>` : ''}` : 'N/A'}</div>
                 </div>
 
                 ${samePriceOrders.length > 0 ? `
@@ -2449,9 +2449,9 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                     ${samePriceOrders.map(order => `
                         <div class="market-order" style="border-left: 3px solid var(--warning);">
                             <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
-                            <div class="market-order-location">${escapeHtml(order.claimName || order.regionName || 'Unknown')}</div>
                             <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
                             <div class="market-order-price" style="color: var(--warning);">${order.price.toLocaleString()}</div>
+                            <div class="market-order-location">${order.claimName ? `<span style="font-weight: 500;">${escapeHtml(order.claimName)}</span>${order.regionName ? `<span style="color: var(--text-muted);"> - ${escapeHtml(order.regionName)}</span>` : ''}` : 'N/A'}</div>
                         </div>
                     `).join('')}
                 ` : ''}
@@ -2461,9 +2461,9 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                     ${cheaperOrders.map(order => `
                         <div class="market-order cheaper">
                             <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
-                            <div class="market-order-location">${escapeHtml(order.claimName || order.regionName || 'Unknown')}</div>
                             <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
                             <div class="market-order-price">${order.price.toLocaleString()}</div>
+                            <div class="market-order-location">${order.claimName ? `<span style="font-weight: 500;">${escapeHtml(order.claimName)}</span>${order.regionName ? `<span style="color: var(--text-muted);"> - ${escapeHtml(order.regionName)}</span>` : ''}` : 'N/A'}</div>
                         </div>
                     `).join('')}
                 ` : '<p style="color: var(--success); font-size: 0.75rem; margin-top: 1rem; font-weight: 500;">✓ You have the cheapest price!</p>'}
@@ -2473,9 +2473,9 @@ function renderMarketDetailsModal(item, playerOrder, cheaperOrders, samePriceOrd
                     ${moreExpensiveOrders.map(order => `
                         <div class="market-order more-expensive">
                             <div class="market-order-seller">${escapeHtml(order.ownerUsername || 'Unknown')}</div>
-                            <div class="market-order-location">${escapeHtml(order.claimName || order.regionName || 'Unknown')}</div>
                             <div class="market-order-quantity">Qty: ${order.quantity.toLocaleString()}</div>
                             <div class="market-order-price">${order.price.toLocaleString()}</div>
+                            <div class="market-order-location">${order.claimName ? `<span style="font-weight: 500;">${escapeHtml(order.claimName)}</span>${order.regionName ? `<span style="color: var(--text-muted);"> - ${escapeHtml(order.regionName)}</span>` : ''}` : 'N/A'}</div>
                         </div>
                     `).join('')}
                 ` : ''}

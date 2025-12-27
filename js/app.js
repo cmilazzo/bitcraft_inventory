@@ -2,6 +2,7 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
+const PROFESSION_API = 'https://t1sveo7mdf.execute-api.us-east-1.amazonaws.com/prod/profession-history';
 const VERSION = '1.0018';
 
 // Current view state
@@ -1942,6 +1943,221 @@ class PlayerMarketViewer {
 
 const playerMarketViewer = new PlayerMarketViewer();
 
+class ProfessionHistoryViewer {
+    constructor() {
+        this.selectedPlayer = null;
+        this.chartInstance = null;
+        this.timeRange = 24; // hours
+        this.interval = 'raw';
+        this.visibleProfessions = new Set([
+            'carpentry', 'farming', 'fishing', 'foraging',
+            'forestry', 'hunting', 'leatherworking', 'masonry',
+            'mining', 'scholar', 'smithing', 'tailoring'
+        ]);
+    }
+
+    async fetchHistory(playerId, hours = 24, interval = 'raw') {
+        const endTime = Math.floor(Date.now() / 1000);
+        const startTime = endTime - (hours * 3600);
+
+        const url = `${PROFESSION_API}?playerId=${playerId}&startTime=${startTime}&endTime=${endTime}&interval=${interval}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching profession history:', error);
+            throw error;
+        }
+    }
+
+    async render(playerId = null) {
+        if (playerId) {
+            this.selectedPlayer = playerId;
+        }
+
+        if (!this.selectedPlayer) {
+            this.renderEmptyState();
+            return;
+        }
+
+        try {
+            const data = await this.fetchHistory(this.selectedPlayer, this.timeRange, this.interval);
+            this.renderChart(data);
+        } catch (error) {
+            this.renderError(error.message);
+        }
+    }
+
+    renderEmptyState() {
+        const chartCanvas = document.getElementById('profession-chart');
+        if (chartCanvas) {
+            chartCanvas.style.display = 'none';
+        }
+        const messageDiv = document.getElementById('profession-message');
+        if (messageDiv) {
+            messageDiv.innerHTML = '<p class="empty-state">Select a player to view profession history.</p>';
+        }
+    }
+
+    renderError(message) {
+        const chartCanvas = document.getElementById('profession-chart');
+        if (chartCanvas) {
+            chartCanvas.style.display = 'none';
+        }
+        const messageDiv = document.getElementById('profession-message');
+        if (messageDiv) {
+            messageDiv.innerHTML = `<p class="empty-state" style="color: var(--error);">Error loading data: ${message}</p>`;
+        }
+    }
+
+    renderChart(data) {
+        const chartCanvas = document.getElementById('profession-chart');
+        if (!chartCanvas) return;
+
+        chartCanvas.style.display = 'block';
+
+        const messageDiv = document.getElementById('profession-message');
+        if (messageDiv) {
+            messageDiv.innerHTML = '';
+        }
+
+        const ctx = chartCanvas.getContext('2d');
+
+        const professions = Array.from(this.visibleProfessions);
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+            '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+            '#f97316', '#6366f1', '#14b8a6', '#a855f7'
+        ];
+
+        const datasets = professions.map((prof, i) => ({
+            label: prof.charAt(0).toUpperCase() + prof.slice(1),
+            data: data.data.map(point => ({
+                x: point.timestamp * 1000,
+                y: point[prof] || 0
+            })),
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '20',
+            borderWidth: 2,
+            tension: 0.4,
+            pointRadius: 2,
+            pointHoverRadius: 5
+        }));
+
+        if (this.chartInstance) {
+            this.chartInstance.destroy();
+        }
+
+        this.chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: this.interval === 'daily' ? 'day' : 'hour',
+                            displayFormats: {
+                                hour: 'MMM d, HH:mm',
+                                day: 'MMM d'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time',
+                            color: '#9ca3af'
+                        },
+                        grid: {
+                            color: '#374151'
+                        },
+                        ticks: {
+                            color: '#9ca3af'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Experience Points',
+                            color: '#9ca3af'
+                        },
+                        beginAtZero: true,
+                        grid: {
+                            color: '#374151'
+                        },
+                        ticks: {
+                            color: '#9ca3af'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#9ca3af',
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: `Profession Experience History - Player ${this.selectedPlayer}`,
+                        color: '#f3f4f6',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        borderColor: '#4b5563',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+
+    updateTimeRange(hours) {
+        this.timeRange = hours;
+        if (this.selectedPlayer) {
+            this.render();
+        }
+    }
+
+    updateInterval(interval) {
+        this.interval = interval;
+        if (this.selectedPlayer) {
+            this.render();
+        }
+    }
+
+    toggleProfession(profession) {
+        if (this.visibleProfessions.has(profession)) {
+            this.visibleProfessions.delete(profession);
+        } else {
+            this.visibleProfessions.add(profession);
+        }
+        if (this.selectedPlayer) {
+            this.render();
+        }
+    }
+}
+
+const professionViewer = new ProfessionHistoryViewer();
+
 // View Navigation Setup
 function setupNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
@@ -1957,7 +2173,7 @@ function setupNavigation() {
     // Load view from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get('view');
-    if (viewParam && (viewParam === 'inventory' || viewParam === 'market' || viewParam === 'player-market')) {
+    if (viewParam && (viewParam === 'inventory' || viewParam === 'market' || viewParam === 'player-market' || viewParam === 'profession-history')) {
         switchView(viewParam);
     }
 }
@@ -2062,6 +2278,22 @@ async function switchView(view) {
 
         footer.style.display = 'none';
         await renderPlayerMarketView();
+    } else if (view === 'profession-history') {
+        // Show player management for player selection
+        if (playerManagement) playerManagement.style.display = '';
+
+        // Hide inventory controls
+        if (viewControlsSection) {
+            viewControlsSection.style.display = 'none';
+        }
+
+        // Remove market controls if present
+        if (marketControlsSection) {
+            marketControlsSection.remove();
+        }
+
+        footer.style.display = 'none';
+        await renderProfessionHistoryView();
     }
 }
 
@@ -2717,6 +2949,82 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+async function renderProfessionHistoryView() {
+    const inventoryDisplay = document.querySelector('.inventory-display');
+    if (!inventoryDisplay) return;
+
+    // Create the profession history HTML
+    const professionHistoryHTML = `
+        <div id="profession-history-content">
+            <div class="profession-controls">
+                <div class="control-row">
+                    <div class="control-group">
+                        <label>Time Range:</label>
+                        <select id="time-range-select">
+                            <option value="1">Last Hour</option>
+                            <option value="6">Last 6 Hours</option>
+                            <option value="24" selected>Last 24 Hours</option>
+                            <option value="168">Last 7 Days</option>
+                            <option value="720">Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Interval:</label>
+                        <select id="interval-select">
+                            <option value="raw" selected>Raw Data</option>
+                            <option value="hourly">Hourly Average</option>
+                            <option value="daily">Daily Average</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="profession-message"></div>
+            <div class="chart-container" style="position: relative; height: 500px; margin-top: 1rem;">
+                <canvas id="profession-chart"></canvas>
+            </div>
+        </div>
+    `;
+
+    inventoryDisplay.innerHTML = professionHistoryHTML;
+
+    // Setup event listeners
+    const timeRangeSelect = document.getElementById('time-range-select');
+    const intervalSelect = document.getElementById('interval-select');
+
+    timeRangeSelect.addEventListener('change', () => {
+        professionViewer.updateTimeRange(parseInt(timeRangeSelect.value));
+    });
+
+    intervalSelect.addEventListener('change', () => {
+        professionViewer.updateInterval(intervalSelect.value);
+    });
+
+    // Setup player click handlers
+    const playerChips = document.querySelectorAll('.player-chip');
+    playerChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const playerId = chip.dataset.entityId;
+            if (playerId) {
+                document.querySelectorAll('.player-chip').forEach(c => c.classList.remove('selected'));
+                chip.classList.add('selected');
+                professionViewer.render(playerId);
+            }
+        });
+    });
+
+    // Render with first player if available
+    const firstPlayerChip = document.querySelector('.player-chip');
+    if (firstPlayerChip) {
+        firstPlayerChip.classList.add('selected');
+        const firstPlayerId = firstPlayerChip.dataset.entityId;
+        if (firstPlayerId) {
+            await professionViewer.render(firstPlayerId);
+        }
+    } else {
+        professionViewer.renderEmptyState();
+    }
 }
 
 // Initialize navigation

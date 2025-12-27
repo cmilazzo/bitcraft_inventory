@@ -2957,9 +2957,9 @@ async function renderProfessionHistoryView() {
 
     // Static list of tracked players (matches Lambda configuration)
     const trackedPlayers = [
-        { id: '648518346386713124', name: 'Player 1' },
-        { id: '648518346396632661', name: 'Player 2' },
-        { id: '360287970289767980', name: 'Player 3' }
+        { id: '648518346386713124', name: 'Bulge' },
+        { id: '648518346396632661', name: 'LiverWurst' },
+        { id: '360287970289767980', name: 'OracleDelphi' }
     ];
 
     // Create the profession history HTML

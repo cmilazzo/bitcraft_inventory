@@ -2085,7 +2085,9 @@ class ProfessionHistoryViewer {
             borderColor: colors[i % colors.length],
             borderWidth: 1,
             yAxisID: 'y1',
-            stack: 'xpPerMin'
+            stack: 'xpPerMin',
+            barPercentage: 1.0,
+            categoryPercentage: 1.0
         }));
 
         const datasets = [...lineDatasets, ...barDatasets];
@@ -2115,6 +2117,7 @@ class ProfessionHistoryViewer {
                                 day: 'MMM d'
                             }
                         },
+                        offset: false,
                         title: {
                             display: true,
                             text: 'Time',

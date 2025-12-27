@@ -1,0 +1,34 @@
+# Claude Code
+.claude/
+
+# AWS Lambda
+lambda-poller/
+lambda-api/
+lambda-poller.zip
+lambda-api.zip
+lambda-poller-updated.zip
+lambda-test-output*.json
+lambda-test-output*.txt
+
+# AWS Configuration
+lambda-trust-policy.json
+lambda-env.json
+dynamodb-read-policy.json
+dynamodb-write-policy.json
+
+# Temp files
+nul
+Userstd$Documentsbitcraft_inventorylambda-test-output.json
+
+# Node modules (if any in root)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

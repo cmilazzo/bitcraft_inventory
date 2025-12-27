@@ -2107,6 +2107,30 @@ class ProfessionHistoryViewer {
                             color: '#9ca3af',
                             usePointStyle: true,
                             padding: 15
+                        },
+                        onClick: (e, legendItem, legend) => {
+                            const index = legendItem.datasetIndex;
+                            const chart = legend.chart;
+
+                            // Check if this is the only visible dataset
+                            const visibleCount = chart.data.datasets.filter((ds, i) => chart.isDatasetVisible(i)).length;
+                            const isOnlyVisible = visibleCount === 1 && chart.isDatasetVisible(index);
+
+                            if (isOnlyVisible) {
+                                // If this is the only visible one, show all
+                                chart.data.datasets.forEach((dataset, i) => {
+                                    chart.show(i);
+                                });
+                            } else {
+                                // Hide all datasets
+                                chart.data.datasets.forEach((dataset, i) => {
+                                    chart.hide(i);
+                                });
+                                // Show only the clicked one
+                                chart.show(index);
+                            }
+
+                            chart.update();
                         }
                     },
                     title: {

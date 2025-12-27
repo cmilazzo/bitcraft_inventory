@@ -1386,7 +1386,7 @@ footer button:active {
     background: var(--bg-secondary);
     padding: 1rem;
     border-radius: 8px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 .profession-controls .control-row {

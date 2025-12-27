@@ -1946,6 +1946,7 @@ const playerMarketViewer = new PlayerMarketViewer();
 class ProfessionHistoryViewer {
     constructor() {
         this.selectedPlayer = null;
+        this.selectedPlayerName = null;
         this.chartInstance = null;
         this.timeRange = 24; // hours
         this.interval = 'raw';
@@ -1954,6 +1955,11 @@ class ProfessionHistoryViewer {
             'forestry', 'hunting', 'leatherworking', 'masonry',
             'mining', 'scholar', 'smithing', 'tailoring'
         ]);
+        this.playerNames = {
+            '648518346386713124': 'Bulge',
+            '648518346396632661': 'LiverWurst',
+            '360287970289767980': 'OracleDelphi'
+        };
     }
 
     async fetchHistory(playerId, hours = 24, interval = 'raw') {
@@ -1977,6 +1983,7 @@ class ProfessionHistoryViewer {
     async render(playerId = null) {
         if (playerId) {
             this.selectedPlayer = playerId;
+            this.selectedPlayerName = this.playerNames[playerId] || playerId;
         }
 
         if (!this.selectedPlayer) {
@@ -2135,7 +2142,7 @@ class ProfessionHistoryViewer {
                     },
                     title: {
                         display: true,
-                        text: `Profession Experience History - Player ${this.selectedPlayer}`,
+                        text: `Profession Experience History - ${this.selectedPlayerName}`,
                         color: '#f3f4f6',
                         font: {
                             size: 16,

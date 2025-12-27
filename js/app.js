@@ -2041,26 +2041,61 @@ class ProfessionHistoryViewer {
             '#f97316', '#6366f1', '#14b8a6', '#a855f7'
         ];
 
-        const datasets = professions.map((prof, i) => ({
+        // Create line datasets for total XP
+        const lineDatasets = professions.map((prof, i) => ({
             label: prof.charAt(0).toUpperCase() + prof.slice(1),
             data: data.data.map(point => ({
                 x: point.timestamp * 1000,
                 y: point[prof] || 0
             })),
+            type: 'line',
             borderColor: colors[i % colors.length],
             backgroundColor: colors[i % colors.length] + '20',
             borderWidth: 2,
             tension: 0.4,
             pointRadius: 2,
-            pointHoverRadius: 5
+            pointHoverRadius: 5,
+            yAxisID: 'y'
         }));
+
+        // Calculate XP per minute for bar chart
+        const xpPerMinData = [];
+        for (let i = 1; i < data.data.length; i++) {
+            const current = data.data[i];
+            const previous = data.data[i - 1];
+            const timeDiffMinutes = (current.timestamp - previous.timestamp) / 60;
+
+            const xpRates = { timestamp: current.timestamp * 1000 };
+            professions.forEach(prof => {
+                const xpDiff = (current[prof] || 0) - (previous[prof] || 0);
+                xpRates[prof] = timeDiffMinutes > 0 ? xpDiff / timeDiffMinutes : 0;
+            });
+            xpPerMinData.push(xpRates);
+        }
+
+        // Create stacked bar datasets for XP/min
+        const barDatasets = professions.map((prof, i) => ({
+            label: prof.charAt(0).toUpperCase() + prof.slice(1) + ' (XP/min)',
+            data: xpPerMinData.map(point => ({
+                x: point.timestamp,
+                y: point[prof] || 0
+            })),
+            type: 'bar',
+            backgroundColor: colors[i % colors.length] + '80',
+            borderColor: colors[i % colors.length],
+            borderWidth: 1,
+            yAxisID: 'y1',
+            stack: 'xpPerMin'
+        }));
+
+        const datasets = [...lineDatasets, ...barDatasets];
 
         if (this.chartInstance) {
             this.chartInstance.destroy();
         }
 
         this.chartInstance = new Chart(ctx, {
-            type: 'line',
+            type: 'bar',
             data: { datasets },
             options: {
                 responsive: true,
@@ -2093,14 +2128,32 @@ class ProfessionHistoryViewer {
                         }
                     },
                     y: {
+                        type: 'linear',
+                        position: 'left',
                         title: {
                             display: true,
-                            text: 'Experience Points',
+                            text: 'Total Experience Points',
                             color: '#9ca3af'
                         },
                         beginAtZero: true,
                         grid: {
                             color: '#374151'
+                        },
+                        ticks: {
+                            color: '#9ca3af'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'XP per Minute',
+                            color: '#9ca3af'
+                        },
+                        beginAtZero: true,
+                        grid: {
+                            drawOnChartArea: false
                         },
                         ticks: {
                             color: '#9ca3af'
@@ -2113,18 +2166,28 @@ class ProfessionHistoryViewer {
                         labels: {
                             color: '#9ca3af',
                             usePointStyle: true,
-                            padding: 15
+                            padding: 15,
+                            filter: function(item, chart) {
+                                // Only show line datasets in legend (not the XP/min bars)
+                                return !item.text.includes('(XP/min)');
+                            }
                         },
                         onClick: (e, legendItem, legend) => {
                             const index = legendItem.datasetIndex;
                             const chart = legend.chart;
+                            const professionCount = professions.length;
 
-                            // Check if this is the only visible dataset
-                            const visibleCount = chart.data.datasets.filter((ds, i) => chart.isDatasetVisible(i)).length;
-                            const isOnlyVisible = visibleCount === 1 && chart.isDatasetVisible(index);
+                            // Get corresponding bar dataset index (line index + professionCount)
+                            const barIndex = index + professionCount;
+
+                            // Check if this profession is the only visible one
+                            const visibleLineCount = chart.data.datasets
+                                .filter((ds, i) => i < professionCount && chart.isDatasetVisible(i))
+                                .length;
+                            const isOnlyVisible = visibleLineCount === 1 && chart.isDatasetVisible(index);
 
                             if (isOnlyVisible) {
-                                // If this is the only visible one, show all
+                                // Show all professions (both line and bar)
                                 chart.data.datasets.forEach((dataset, i) => {
                                     chart.show(i);
                                 });
@@ -2133,8 +2196,9 @@ class ProfessionHistoryViewer {
                                 chart.data.datasets.forEach((dataset, i) => {
                                     chart.hide(i);
                                 });
-                                // Show only the clicked one
+                                // Show only the clicked profession (both line and bar)
                                 chart.show(index);
+                                chart.show(barIndex);
                             }
 
                             chart.update();

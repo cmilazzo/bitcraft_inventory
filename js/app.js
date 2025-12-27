@@ -2279,8 +2279,8 @@ async function switchView(view) {
         footer.style.display = 'none';
         await renderPlayerMarketView();
     } else if (view === 'profession-history') {
-        // Show player management for player selection
-        if (playerManagement) playerManagement.style.display = '';
+        // Hide player management (using dropdown instead)
+        if (playerManagement) playerManagement.style.display = 'none';
 
         // Hide inventory controls
         if (viewControlsSection) {
@@ -2955,11 +2955,26 @@ async function renderProfessionHistoryView() {
     const inventoryDisplay = document.querySelector('.inventory-display');
     if (!inventoryDisplay) return;
 
+    // Static list of tracked players (matches Lambda configuration)
+    const trackedPlayers = [
+        { id: '648518346386713124', name: 'Player 1' },
+        { id: '648518346396632661', name: 'Player 2' },
+        { id: '360287970289767980', name: 'Player 3' }
+    ];
+
     // Create the profession history HTML
     const professionHistoryHTML = `
         <div id="profession-history-content">
             <div class="profession-controls">
                 <div class="control-row">
+                    <div class="control-group">
+                        <label>Select Player:</label>
+                        <select id="player-select">
+                            ${trackedPlayers.map((player, index) => `
+                                <option value="${player.id}" ${index === 0 ? 'selected' : ''}>${player.name}</option>
+                            `).join('')}
+                        </select>
+                    </div>
                     <div class="control-group">
                         <label>Time Range:</label>
                         <select id="time-range-select">
@@ -2990,8 +3005,13 @@ async function renderProfessionHistoryView() {
     inventoryDisplay.innerHTML = professionHistoryHTML;
 
     // Setup event listeners
+    const playerSelect = document.getElementById('player-select');
     const timeRangeSelect = document.getElementById('time-range-select');
     const intervalSelect = document.getElementById('interval-select');
+
+    playerSelect.addEventListener('change', () => {
+        professionViewer.render(playerSelect.value);
+    });
 
     timeRangeSelect.addEventListener('change', () => {
         professionViewer.updateTimeRange(parseInt(timeRangeSelect.value));
@@ -3001,30 +3021,8 @@ async function renderProfessionHistoryView() {
         professionViewer.updateInterval(intervalSelect.value);
     });
 
-    // Setup player click handlers
-    const playerChips = document.querySelectorAll('.player-chip');
-    playerChips.forEach(chip => {
-        chip.addEventListener('click', () => {
-            const playerId = chip.dataset.entityId;
-            if (playerId) {
-                document.querySelectorAll('.player-chip').forEach(c => c.classList.remove('selected'));
-                chip.classList.add('selected');
-                professionViewer.render(playerId);
-            }
-        });
-    });
-
-    // Render with first player if available
-    const firstPlayerChip = document.querySelector('.player-chip');
-    if (firstPlayerChip) {
-        firstPlayerChip.classList.add('selected');
-        const firstPlayerId = firstPlayerChip.dataset.entityId;
-        if (firstPlayerId) {
-            await professionViewer.render(firstPlayerId);
-        }
-    } else {
-        professionViewer.renderEmptyState();
-    }
+    // Render with first player
+    await professionViewer.render(trackedPlayers[0].id);
 }
 
 // Initialize navigation

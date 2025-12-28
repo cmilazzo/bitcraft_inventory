@@ -2303,7 +2303,8 @@ class ProfessionHistoryViewer {
                     data: gains.map(g => g.gain),
                     backgroundColor: gains.map(g => g.color + 'CC'),
                     borderColor: gains.map(g => g.color),
-                    borderWidth: 2
+                    borderWidth: 2,
+                    maxBarThickness: 50
                 }]
             },
             options: {

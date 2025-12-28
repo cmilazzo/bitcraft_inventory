@@ -1948,6 +1948,7 @@ class ProfessionHistoryViewer {
         this.selectedPlayer = null;
         this.selectedPlayerName = null;
         this.chartInstance = null;
+        this.summaryChartInstance = null;
         this.timeRange = 1; // hours (default to 1 hour)
         this.interval = 'raw';
         this.visibleProfessions = new Set([
@@ -2017,6 +2018,10 @@ class ProfessionHistoryViewer {
         if (chartCanvas) {
             chartCanvas.style.display = 'none';
         }
+        const summaryCanvas = document.getElementById('profession-summary-chart');
+        if (summaryCanvas) {
+            summaryCanvas.style.display = 'none';
+        }
         const messageDiv = document.getElementById('profession-message');
         if (messageDiv) {
             messageDiv.innerHTML = '<span style="color: var(--text-muted); font-size: 0.875rem;">Select a player to view data</span>';
@@ -2027,6 +2032,10 @@ class ProfessionHistoryViewer {
         const chartCanvas = document.getElementById('profession-chart');
         if (chartCanvas) {
             chartCanvas.style.display = 'none';
+        }
+        const summaryCanvas = document.getElementById('profession-summary-chart');
+        if (summaryCanvas) {
+            summaryCanvas.style.display = 'none';
         }
         const messageDiv = document.getElementById('profession-message');
         if (messageDiv) {
@@ -2236,6 +2245,125 @@ class ProfessionHistoryViewer {
                         bodyColor: '#d1d5db',
                         borderColor: '#4b5563',
                         borderWidth: 1
+                    }
+                }
+            }
+        });
+
+        // Render summary chart
+        this.renderSummaryChart(data);
+    }
+
+    renderSummaryChart(data) {
+        const summaryCanvas = document.getElementById('profession-summary-chart');
+        if (!summaryCanvas) return;
+
+        summaryCanvas.style.display = 'block';
+
+        const ctx = summaryCanvas.getContext('2d');
+
+        const professions = Array.from(this.visibleProfessions);
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+            '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+            '#f97316', '#6366f1', '#14b8a6', '#a855f7'
+        ];
+
+        // Calculate total gains (last - first data point)
+        if (data.data.length < 2) {
+            summaryCanvas.style.display = 'none';
+            return;
+        }
+
+        const firstPoint = data.data[0];
+        const lastPoint = data.data[data.data.length - 1];
+
+        const gains = professions.map((prof, index) => ({
+            profession: prof,
+            gain: (lastPoint[prof] || 0) - (firstPoint[prof] || 0),
+            color: colors[index % colors.length]
+        })).filter(item => item.gain > 0)
+          .sort((a, b) => b.gain - a.gain);
+
+        if (gains.length === 0) {
+            summaryCanvas.style.display = 'none';
+            return;
+        }
+
+        if (this.summaryChartInstance) {
+            this.summaryChartInstance.destroy();
+        }
+
+        this.summaryChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: gains.map(g => g.profession.charAt(0).toUpperCase() + g.profession.slice(1)),
+                datasets: [{
+                    label: 'Total XP Gained',
+                    data: gains.map(g => g.gain),
+                    backgroundColor: gains.map(g => g.color + 'CC'),
+                    borderColor: gains.map(g => g.color),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: `Total XP Gains - ${this.selectedPlayerName}`,
+                        color: '#f3f4f6',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        borderColor: '#4b5563',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return `Total Gained: ${context.parsed.x.toLocaleString()} XP`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Experience Points Gained',
+                            color: '#9ca3af'
+                        },
+                        grid: {
+                            color: '#374151'
+                        },
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: function(value) {
+                                return value.toLocaleString();
+                            }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#9ca3af',
+                            font: {
+                                size: 13
+                            }
+                        }
                     }
                 }
             }
@@ -3104,6 +3232,9 @@ async function renderProfessionHistoryView() {
             </div>
             <div class="chart-container" style="position: relative; height: 500px; margin-top: 1rem;">
                 <canvas id="profession-chart"></canvas>
+            </div>
+            <div class="chart-container" style="position: relative; height: 400px; margin-top: 1rem;">
+                <canvas id="profession-summary-chart"></canvas>
             </div>
         </div>
     `;

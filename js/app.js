@@ -2244,7 +2244,10 @@ class ProfessionHistoryViewer {
                         titleColor: '#f3f4f6',
                         bodyColor: '#d1d5db',
                         borderColor: '#4b5563',
-                        borderWidth: 1
+                        borderWidth: 1,
+                        filter: function(tooltipItem) {
+                            return tooltipItem.parsed.y !== 0;
+                        }
                     }
                 }
             }
@@ -2330,6 +2333,9 @@ class ProfessionHistoryViewer {
                         bodyColor: '#d1d5db',
                         borderColor: '#4b5563',
                         borderWidth: 1,
+                        filter: function(tooltipItem) {
+                            return tooltipItem.parsed.x !== 0;
+                        },
                         callbacks: {
                             label: function(context) {
                                 return `Total Gained: ${context.parsed.x.toLocaleString()} XP`;

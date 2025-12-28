@@ -1948,7 +1948,7 @@ class ProfessionHistoryViewer {
         this.selectedPlayer = null;
         this.selectedPlayerName = null;
         this.chartInstance = null;
-        this.timeRange = 24; // hours
+        this.timeRange = 1; // hours (default to 1 hour)
         this.interval = 'raw';
         this.visibleProfessions = new Set([
             'carpentry', 'farming', 'fishing', 'foraging',
@@ -1960,6 +1960,17 @@ class ProfessionHistoryViewer {
             '648518346396632661': 'LiverWurst',
             '360287970289767980': 'OracleDelphi'
         };
+    }
+
+    updateUrl() {
+        const params = new URLSearchParams(window.location.search);
+        params.set('view', 'profession-history');
+        if (this.selectedPlayer) {
+            params.set('player', this.selectedPlayer);
+        }
+        params.set('hours', this.timeRange);
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
     }
 
     async fetchHistory(playerId, hours = 24, interval = 'raw') {
@@ -1990,6 +2001,8 @@ class ProfessionHistoryViewer {
             this.renderEmptyState();
             return;
         }
+
+        this.updateUrl();
 
         try {
             const data = await this.fetchHistory(this.selectedPlayer, this.timeRange, this.interval);
@@ -2111,8 +2124,9 @@ class ProfessionHistoryViewer {
                     x: {
                         type: 'time',
                         time: {
-                            unit: this.interval === 'daily' ? 'day' : 'hour',
+                            unit: this.timeRange <= 6 ? 'minute' : (this.timeRange > 168 ? 'day' : 'hour'),
                             displayFormats: {
+                                minute: 'HH:mm',
                                 hour: 'MMM d, HH:mm',
                                 day: 'MMM d'
                             }
@@ -2230,13 +2244,6 @@ class ProfessionHistoryViewer {
 
     updateTimeRange(hours) {
         this.timeRange = hours;
-        if (this.selectedPlayer) {
-            this.render();
-        }
-    }
-
-    updateInterval(interval) {
-        this.interval = interval;
         if (this.selectedPlayer) {
             this.render();
         }
@@ -3060,6 +3067,15 @@ async function renderProfessionHistoryView() {
         { id: '360287970289767980', name: 'OracleDelphi' }
     ];
 
+    // Read URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPlayer = urlParams.get('player');
+    const urlHours = urlParams.get('hours');
+
+    // Set initial values from URL or defaults
+    const initialPlayer = urlPlayer || trackedPlayers[0].id;
+    const initialHours = urlHours ? parseInt(urlHours) : 1;
+
     // Create the profession history HTML
     const professionHistoryHTML = `
         <div id="profession-history-content">
@@ -3068,27 +3084,19 @@ async function renderProfessionHistoryView() {
                     <div class="control-group">
                         <label>Select Player:</label>
                         <select id="player-select">
-                            ${trackedPlayers.map((player, index) => `
-                                <option value="${player.id}" ${index === 0 ? 'selected' : ''}>${player.name}</option>
+                            ${trackedPlayers.map((player) => `
+                                <option value="${player.id}" ${player.id === initialPlayer ? 'selected' : ''}>${player.name}</option>
                             `).join('')}
                         </select>
                     </div>
                     <div class="control-group">
                         <label>Time Range:</label>
                         <select id="time-range-select">
-                            <option value="1">Last Hour</option>
-                            <option value="6">Last 6 Hours</option>
-                            <option value="24" selected>Last 24 Hours</option>
-                            <option value="168">Last 7 Days</option>
-                            <option value="720">Last 30 Days</option>
-                        </select>
-                    </div>
-                    <div class="control-group">
-                        <label>Interval:</label>
-                        <select id="interval-select">
-                            <option value="raw" selected>Raw Data</option>
-                            <option value="hourly">Hourly Average</option>
-                            <option value="daily">Daily Average</option>
+                            <option value="1" ${initialHours === 1 ? 'selected' : ''}>Last Hour</option>
+                            <option value="6" ${initialHours === 6 ? 'selected' : ''}>Last 6 Hours</option>
+                            <option value="24" ${initialHours === 24 ? 'selected' : ''}>Last 24 Hours</option>
+                            <option value="168" ${initialHours === 168 ? 'selected' : ''}>Last 7 Days</option>
+                            <option value="720" ${initialHours === 720 ? 'selected' : ''}>Last 30 Days</option>
                         </select>
                     </div>
                 </div>
@@ -3102,10 +3110,12 @@ async function renderProfessionHistoryView() {
 
     inventoryDisplay.innerHTML = professionHistoryHTML;
 
+    // Set initial timeRange from URL
+    professionViewer.timeRange = initialHours;
+
     // Setup event listeners
     const playerSelect = document.getElementById('player-select');
     const timeRangeSelect = document.getElementById('time-range-select');
-    const intervalSelect = document.getElementById('interval-select');
 
     playerSelect.addEventListener('change', () => {
         professionViewer.render(playerSelect.value);
@@ -3115,12 +3125,8 @@ async function renderProfessionHistoryView() {
         professionViewer.updateTimeRange(parseInt(timeRangeSelect.value));
     });
 
-    intervalSelect.addEventListener('change', () => {
-        professionViewer.updateInterval(intervalSelect.value);
-    });
-
-    // Render with first player
-    await professionViewer.render(trackedPlayers[0].id);
+    // Render with initial player
+    await professionViewer.render(initialPlayer);
 }
 
 // Initialize navigation

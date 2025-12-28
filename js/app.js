@@ -2019,7 +2019,7 @@ class ProfessionHistoryViewer {
         }
         const messageDiv = document.getElementById('profession-message');
         if (messageDiv) {
-            messageDiv.innerHTML = '<p class="empty-state">Select a player to view profession history.</p>';
+            messageDiv.innerHTML = '<span style="color: var(--text-muted); font-size: 0.875rem;">Select a player to view data</span>';
         }
     }
 
@@ -2030,7 +2030,7 @@ class ProfessionHistoryViewer {
         }
         const messageDiv = document.getElementById('profession-message');
         if (messageDiv) {
-            messageDiv.innerHTML = `<p class="empty-state" style="color: var(--error);">Error loading data: ${message}</p>`;
+            messageDiv.innerHTML = `<span style="color: var(--error); font-size: 0.875rem;">Error: ${message}</span>`;
         }
     }
 
@@ -3099,9 +3099,9 @@ async function renderProfessionHistoryView() {
                             <option value="720" ${initialHours === 720 ? 'selected' : ''}>Last 30 Days</option>
                         </select>
                     </div>
+                    <div id="profession-message" style="margin-left: auto; display: flex; align-items: center;"></div>
                 </div>
             </div>
-            <div id="profession-message"></div>
             <div class="chart-container" style="position: relative; height: 500px; margin-top: 1rem;">
                 <canvas id="profession-chart"></canvas>
             </div>

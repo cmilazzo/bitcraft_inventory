@@ -2209,7 +2209,7 @@ class ProfessionHistoryViewer {
                     },
                     title: {
                         display: true,
-                        text: `Profession Experience History - ${this.selectedPlayerName}`,
+                        text: `Profession Experience - ${this.selectedPlayerName}`,
                         color: '#f3f4f6',
                         font: {
                             size: 16,

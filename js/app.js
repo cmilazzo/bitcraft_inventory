@@ -1959,7 +1959,13 @@ class ProfessionHistoryViewer {
         this.playerNames = {
             '648518346386713124': 'Bulge',
             '648518346396632661': 'LiverWurst',
-            '360287970289767980': 'OracleDelphi'
+            '360287970289767980': 'OracleDelphi',
+            '216172782249268159': 'Goal',
+            '144115188155088129': 'Storm8',
+            '432345564400733908': 'OracleSCV',
+            '504403158317668275': 'OrcPeon',
+            '648518346371588437': 'OnyxxynO',
+            '576460752432286687': 'deirdresm'
         };
     }
 
@@ -3199,7 +3205,13 @@ async function renderProfessionHistoryView() {
     const trackedPlayers = [
         { id: '648518346386713124', name: 'Bulge' },
         { id: '648518346396632661', name: 'LiverWurst' },
-        { id: '360287970289767980', name: 'OracleDelphi' }
+        { id: '360287970289767980', name: 'OracleDelphi' },
+        { id: '216172782249268159', name: 'Goal' },
+        { id: '144115188155088129', name: 'Storm8' },
+        { id: '432345564400733908', name: 'OracleSCV' },
+        { id: '504403158317668275', name: 'OrcPeon' },
+        { id: '648518346371588437', name: 'OnyxxynO' },
+        { id: '576460752432286687', name: 'deirdresm' }
     ];
 
     // Read URL parameters

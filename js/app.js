@@ -2433,8 +2433,9 @@ async function switchView(view) {
         link.classList.toggle('active', link.dataset.view === view);
     });
 
-    // Update URL without reload
+    // Update URL without reload - clear all params first, then set view
     const url = new URL(window.location);
+    url.search = ''; // Clear all parameters
     url.searchParams.set('view', view);
     window.history.pushState({}, '', url);
 

@@ -1965,7 +1965,8 @@ class ProfessionHistoryViewer {
             '432345564400733908': 'OracleSCV',
             '504403158317668275': 'OrcPeon',
             '648518346371588437': 'OnyxxynO',
-            '576460752432286687': 'deirdresm'
+            '576460752432286687': 'deirdresm',
+            '504403158276537417': 'WinterAurelius'
         };
     }
 
@@ -3211,7 +3212,8 @@ async function renderProfessionHistoryView() {
         { id: '432345564400733908', name: 'OracleSCV' },
         { id: '504403158317668275', name: 'OrcPeon' },
         { id: '648518346371588437', name: 'OnyxxynO' },
-        { id: '576460752432286687', name: 'deirdresm' }
+        { id: '576460752432286687', name: 'deirdresm' },
+        { id: '504403158276537417', name: 'WinterAurelius' }
     ];
 
     // Read URL parameters

@@ -3243,6 +3243,7 @@ async function renderProfessionHistoryView() {
                         <label>Time Range:</label>
                         <select id="time-range-select">
                             <option value="1" ${initialHours === 1 ? 'selected' : ''}>Last Hour</option>
+                            <option value="3" ${initialHours === 3 ? 'selected' : ''}>Last 3 Hours</option>
                             <option value="6" ${initialHours === 6 ? 'selected' : ''}>Last 6 Hours</option>
                             <option value="24" ${initialHours === 24 ? 'selected' : ''}>Last 24 Hours</option>
                             <option value="168" ${initialHours === 168 ? 'selected' : ''}>Last 7 Days</option>

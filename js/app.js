@@ -2018,7 +2018,9 @@ class ProfessionHistoryViewer {
             '504403158317668275': 'OrcPeon',
             '648518346371588437': 'OnyxxynO',
             '576460752432286687': 'deirdresm',
-            '504403158276537417': 'WinterAurelius'
+            '504403158276537417': 'WinterAurelius',
+            '648518346352847871': 'Andromedia',
+            '648518346363192336': 'Zephrim'
         };
     }
 
@@ -3295,7 +3297,9 @@ async function renderProfessionHistoryView() {
         { id: '504403158317668275', name: 'OrcPeon' },
         { id: '648518346371588437', name: 'OnyxxynO' },
         { id: '576460752432286687', name: 'deirdresm' },
-        { id: '504403158276537417', name: 'WinterAurelius' }
+        { id: '504403158276537417', name: 'WinterAurelius' },
+        { id: '648518346352847871', name: 'Andromedia' },
+        { id: '648518346363192336', name: 'Zephrim' }
     ];
 
     // Read URL parameters

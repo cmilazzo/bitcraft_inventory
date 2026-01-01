@@ -1324,6 +1324,8 @@ class MarketViewer {
         this.sortBy = 'name';
         this.sortOrder = 'asc';
         this.searchTerm = '';
+        this.locationFilter = '';
+        this.regionFilter = '';
         this.loadFromUrl();
     }
 
@@ -1357,6 +1359,18 @@ class MarketViewer {
         const search = params.get('mkt_search');
         if (search) {
             this.searchTerm = search;
+        }
+
+        // Load location filter (market-specific parameter)
+        const location = params.get('mkt_location');
+        if (location) {
+            this.locationFilter = location;
+        }
+
+        // Load region filter (market-specific parameter)
+        const region = params.get('mkt_region');
+        if (region) {
+            this.regionFilter = region;
         }
     }
 
@@ -1395,6 +1409,20 @@ class MarketViewer {
             params.set('mkt_search', this.searchTerm);
         } else {
             params.delete('mkt_search');
+        }
+
+        // Update location filter (market-specific parameter)
+        if (this.locationFilter) {
+            params.set('mkt_location', this.locationFilter);
+        } else {
+            params.delete('mkt_location');
+        }
+
+        // Update region filter (market-specific parameter)
+        if (this.regionFilter) {
+            params.set('mkt_region', this.regionFilter);
+        } else {
+            params.delete('mkt_region');
         }
 
         // Update URL without reload
@@ -1692,6 +1720,22 @@ class MarketViewer {
             filtered = filtered.filter(item => item.name.toLowerCase().includes(search));
         }
 
+        // Filter by location
+        if (this.locationFilter) {
+            const locationSearch = this.locationFilter.toLowerCase();
+            filtered = filtered.filter(item =>
+                item.claimName && item.claimName.toLowerCase().includes(locationSearch)
+            );
+        }
+
+        // Filter by region
+        if (this.regionFilter) {
+            const regionSearch = this.regionFilter.toLowerCase();
+            filtered = filtered.filter(item =>
+                item.regionName && item.regionName.toLowerCase().includes(regionSearch)
+            );
+        }
+
         // Sort items
         filtered.sort((a, b) => {
             let comparison = 0;
@@ -1710,6 +1754,14 @@ class MarketViewer {
                 comparison = aPrice - bPrice;
             } else if (this.sortBy === 'quantity') {
                 comparison = a.sellOrders - b.sellOrders;
+            } else if (this.sortBy === 'location') {
+                const aLocation = a.claimName || '';
+                const bLocation = b.claimName || '';
+                comparison = aLocation.localeCompare(bLocation);
+            } else if (this.sortBy === 'region') {
+                const aRegion = a.regionName || '';
+                const bRegion = b.regionName || '';
+                comparison = aRegion.localeCompare(bRegion);
             }
 
             return this.sortOrder === 'desc' ? -comparison : comparison;
@@ -2650,6 +2702,8 @@ async function renderMarketView() {
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
                                 <option value="price">Price</option>
+                                <option value="location">Location</option>
+                                <option value="region">Region</option>
                                 <option value="quantity">Quantity</option>
                             </select>
                         </div>
@@ -2663,6 +2717,14 @@ async function renderMarketView() {
                         <div class="control-group">
                             <label>Search:</label>
                             <input type="text" id="market-search" placeholder="Search items...">
+                        </div>
+                        <div class="control-group">
+                            <label>Location:</label>
+                            <input type="text" id="market-location-filter" placeholder="Filter by location...">
+                        </div>
+                        <div class="control-group">
+                            <label>Region:</label>
+                            <input type="text" id="market-region-filter" placeholder="Filter by region...">
                         </div>
                     </div>
                 </section>
@@ -2997,6 +3059,8 @@ function setupMarketEventListeners() {
     document.getElementById('market-sort-by').value = marketViewer.sortBy;
     document.getElementById('market-sort-order').value = marketViewer.sortOrder;
     document.getElementById('market-search').value = marketViewer.searchTerm;
+    document.getElementById('market-location-filter').value = marketViewer.locationFilter;
+    document.getElementById('market-region-filter').value = marketViewer.regionFilter;
 
     // Tag pill buttons
     document.querySelectorAll('.tag-pill').forEach(pill => {
@@ -3067,6 +3131,20 @@ function setupMarketEventListeners() {
         marketViewer.updateUrl();
         renderMarketTable();
     });
+
+    // Location filter
+    document.getElementById('market-location-filter').addEventListener('input', (e) => {
+        marketViewer.locationFilter = e.target.value;
+        marketViewer.updateUrl();
+        renderMarketTable();
+    });
+
+    // Region filter
+    document.getElementById('market-region-filter').addEventListener('input', (e) => {
+        marketViewer.regionFilter = e.target.value;
+        marketViewer.updateUrl();
+        renderMarketTable();
+    });
 }
 
 async function renderMarketTable() {
@@ -3115,7 +3193,8 @@ async function renderMarketTable() {
                     <th>Tag/Type</th>
                     <th class="sortable-header" data-sort="price" style="cursor: pointer;">Price${getSortIndicator('price')}</th>
                     <th>Seller</th>
-                    <th>Location</th>
+                    <th class="sortable-header" data-sort="location" style="cursor: pointer;">Location${getSortIndicator('location')}</th>
+                    <th class="sortable-header" data-sort="region" style="cursor: pointer;">Region${getSortIndicator('region')}</th>
                     <th class="sortable-header" data-sort="quantity" style="cursor: pointer;">Available${getSortIndicator('quantity')}</th>
                 </tr>
             </thead>
@@ -3132,9 +3211,8 @@ async function renderMarketTable() {
                         <td>${escapeHtml(item.tag)}</td>
                         <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="seller-value">${item.seller || '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="location-value">
-                            ${item.priceLoaded ? (item.claimName ? `<div style="text-align: center;"><div style="font-weight: 600;">${escapeHtml(item.claimName)}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}</div></div>` : 'N/A') : '<span class="loading-text">Loading...</span>'}
-                        </td>
+                        <td class="location-value">${item.priceLoaded ? (item.claimName ? escapeHtml(item.claimName) : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="region-value">${item.priceLoaded ? (item.regionName ? `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="count-value">${item.sellOrders.toLocaleString()}</td>
                     </tr>
                 `).join('')}
@@ -3173,6 +3251,7 @@ async function renderMarketTable() {
                 const priceCell = row.querySelector('.price-value');
                 const sellerCell = row.querySelector('.seller-value');
                 const locationCell = row.querySelector('.location-value');
+                const regionCell = row.querySelector('.region-value');
 
                 if (priceCell) {
                     priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
@@ -3181,11 +3260,13 @@ async function renderMarketTable() {
                     sellerCell.textContent = item.seller || 'N/A';
                 }
                 if (locationCell) {
-                    if (item.claimName) {
-                        const regionInfo = item.regionName ? ` - ${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : '';
-                        locationCell.innerHTML = `<span style="font-weight: 500;">${escapeHtml(item.claimName)}</span><span style="font-size: 0.75rem; color: var(--text-muted);">${regionInfo}</span>`;
+                    locationCell.textContent = item.claimName ? escapeHtml(item.claimName) : 'N/A';
+                }
+                if (regionCell) {
+                    if (item.regionName) {
+                        regionCell.textContent = `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}`;
                     } else {
-                        locationCell.textContent = 'N/A';
+                        regionCell.textContent = 'N/A';
                     }
                 }
             }

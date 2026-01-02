@@ -2000,6 +2000,7 @@ class ProfessionHistoryViewer {
         this.selectedPlayerName = null;
         this.chartInstance = null;
         this.summaryChartInstance = null;
+        this.pieChartInstance = null;
         this.timeRange = 1; // hours (default to 1 hour)
         this.interval = 'raw';
         this.visibleProfessions = new Set([
@@ -2315,6 +2316,12 @@ class ProfessionHistoryViewer {
 
         // Render summary chart
         this.renderSummaryChart(data);
+
+        // Render pie chart
+        this.renderPieChart(data);
+
+        // Update stats display
+        this.updateStatsDisplay(data);
     }
 
     renderSummaryChart(data) {
@@ -2362,7 +2369,7 @@ class ProfessionHistoryViewer {
             data: {
                 labels: gains.map(g => g.profession.charAt(0).toUpperCase() + g.profession.slice(1)),
                 datasets: [{
-                    label: 'Total XP Gained',
+                    label: 'XP Gained',
                     data: gains.map(g => g.gain),
                     backgroundColor: gains.map(g => g.color + 'CC'),
                     borderColor: gains.map(g => g.color),
@@ -2380,7 +2387,7 @@ class ProfessionHistoryViewer {
                     },
                     title: {
                         display: true,
-                        text: `Total XP Gains - ${this.selectedPlayerName}`,
+                        text: `XP Gains per Skill - ${this.selectedPlayerName}`,
                         color: '#f3f4f6',
                         font: {
                             size: 16,
@@ -2435,6 +2442,130 @@ class ProfessionHistoryViewer {
                 }
             }
         });
+    }
+
+    renderPieChart(data) {
+        const pieCanvas = document.getElementById('profession-pie-chart');
+        if (!pieCanvas) return;
+
+        pieCanvas.style.display = 'block';
+
+        const ctx = pieCanvas.getContext('2d');
+
+        const professions = Array.from(this.visibleProfessions);
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+            '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+            '#f97316', '#6366f1', '#14b8a6', '#a855f7'
+        ];
+
+        // Get current totals from last data point
+        if (data.data.length === 0) {
+            pieCanvas.style.display = 'none';
+            return;
+        }
+
+        const lastPoint = data.data[data.data.length - 1];
+
+        const currentTotals = professions.map((prof, index) => ({
+            profession: prof,
+            total: lastPoint[prof] || 0,
+            color: colors[index % colors.length]
+        })).filter(item => item.total > 0)
+          .sort((a, b) => b.total - a.total);
+
+        if (currentTotals.length === 0) {
+            pieCanvas.style.display = 'none';
+            return;
+        }
+
+        if (this.pieChartInstance) {
+            this.pieChartInstance.destroy();
+        }
+
+        this.pieChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: currentTotals.map(item => item.profession.charAt(0).toUpperCase() + item.profession.slice(1)),
+                datasets: [{
+                    data: currentTotals.map(item => item.total),
+                    backgroundColor: currentTotals.map(item => item.color + 'CC'),
+                    borderColor: currentTotals.map(item => item.color),
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#d1d5db',
+                            font: {
+                                size: 11
+                            },
+                            padding: 8,
+                            boxWidth: 12
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Current Total XP by Skill',
+                        color: '#f3f4f6',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleColor: '#f3f4f6',
+                        bodyColor: '#d1d5db',
+                        borderColor: '#4b5563',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value.toLocaleString()} XP (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updateStatsDisplay(data) {
+        const totalXpDisplay = document.getElementById('total-xp-display');
+        const xpGainedDisplay = document.getElementById('xp-gained-display');
+
+        if (!totalXpDisplay || !xpGainedDisplay) return;
+
+        if (data.data.length === 0) {
+            totalXpDisplay.textContent = '-';
+            xpGainedDisplay.textContent = '-';
+            return;
+        }
+
+        const firstPoint = data.data[0];
+        const lastPoint = data.data[data.data.length - 1];
+
+        const professions = Array.from(this.visibleProfessions);
+
+        // Calculate current total XP (sum of all professions at last point)
+        const currentTotal = professions.reduce((sum, prof) => sum + (lastPoint[prof] || 0), 0);
+
+        // Calculate total XP gained (sum of gains across all professions)
+        const totalGained = professions.reduce((sum, prof) => {
+            return sum + ((lastPoint[prof] || 0) - (firstPoint[prof] || 0));
+        }, 0);
+
+        totalXpDisplay.textContent = currentTotal.toLocaleString();
+        xpGainedDisplay.textContent = totalGained >= 0 ? `+${totalGained.toLocaleString()}` : totalGained.toLocaleString();
     }
 
     updateTimeRange(hours) {
@@ -2526,6 +2657,10 @@ async function switchView(view, clearParams = false) {
             professionViewer.summaryChartInstance.destroy();
             professionViewer.summaryChartInstance = null;
         }
+        if (professionViewer.pieChartInstance) {
+            professionViewer.pieChartInstance.destroy();
+            professionViewer.pieChartInstance = null;
+        }
 
         // Check if we need to restore inventory view from player-market, market, or profession-history
         const inventoryDisplay = document.querySelector('.inventory-display');
@@ -2583,6 +2718,10 @@ async function switchView(view, clearParams = false) {
             professionViewer.summaryChartInstance.destroy();
             professionViewer.summaryChartInstance = null;
         }
+        if (professionViewer.pieChartInstance) {
+            professionViewer.pieChartInstance.destroy();
+            professionViewer.pieChartInstance = null;
+        }
 
         // Market controls will be shown by renderMarketView
         footer.style.display = 'none';
@@ -2609,6 +2748,10 @@ async function switchView(view, clearParams = false) {
         if (professionViewer.summaryChartInstance) {
             professionViewer.summaryChartInstance.destroy();
             professionViewer.summaryChartInstance = null;
+        }
+        if (professionViewer.pieChartInstance) {
+            professionViewer.pieChartInstance.destroy();
+            professionViewer.pieChartInstance = null;
         }
 
         footer.style.display = 'none';
@@ -3386,8 +3529,22 @@ async function renderProfessionHistoryView() {
             <div class="chart-container" style="position: relative; height: 500px; margin-top: 1rem;">
                 <canvas id="profession-chart"></canvas>
             </div>
-            <div class="chart-container" style="position: relative; height: 400px; margin-top: 1rem;">
-                <canvas id="profession-summary-chart"></canvas>
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <div class="chart-container" style="position: relative; height: 400px; flex: 0 0 50%;">
+                    <canvas id="profession-summary-chart"></canvas>
+                </div>
+                <div class="chart-container" style="position: relative; height: 400px; flex: 0 0 25%;">
+                    <canvas id="profession-pie-chart"></canvas>
+                </div>
+                <div style="flex: 0 0 25%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-secondary); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-subtle);">
+                    <div style="text-align: center;">
+                        <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1.5rem;">Total XP / XP Gained</div>
+                        <div id="total-xp-display" style="font-size: 2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">-</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.5rem;">Current Total XP</div>
+                        <div id="xp-gained-display" style="font-size: 1.5rem; font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">-</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">XP Gained</div>
+                    </div>
+                </div>
             </div>
         </div>
     `;

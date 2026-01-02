@@ -2467,7 +2467,7 @@ function setupNavigation() {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const view = link.dataset.view;
-            switchView(view);
+            switchView(view, true); // true = user clicked, clear params
         });
     });
 
@@ -2475,11 +2475,11 @@ function setupNavigation() {
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get('view');
     if (viewParam && (viewParam === 'inventory' || viewParam === 'market' || viewParam === 'player-market' || viewParam === 'profession-history')) {
-        switchView(viewParam);
+        switchView(viewParam, false); // false = from URL, preserve params
     }
 }
 
-async function switchView(view) {
+async function switchView(view, clearParams = false) {
     currentView = view;
 
     // Update active link
@@ -2487,9 +2487,12 @@ async function switchView(view) {
         link.classList.toggle('active', link.dataset.view === view);
     });
 
-    // Update URL without reload - clear all params first, then set view
+    // Update URL without reload
     const url = new URL(window.location);
-    url.search = ''; // Clear all parameters
+    if (clearParams) {
+        // Clear all parameters when user clicks navigation
+        url.search = '';
+    }
     url.searchParams.set('view', view);
     window.history.pushState({}, '', url);
 
@@ -2515,15 +2518,26 @@ async function switchView(view) {
 
         footer.style.display = 'flex';
 
-        // Check if we need to restore inventory view from player-market or market
+        // Destroy profession charts if they exist
+        if (professionViewer.chartInstance) {
+            professionViewer.chartInstance.destroy();
+            professionViewer.chartInstance = null;
+        }
+        if (professionViewer.summaryChartInstance) {
+            professionViewer.summaryChartInstance.destroy();
+            professionViewer.summaryChartInstance = null;
+        }
+
+        // Check if we need to restore inventory view from player-market, market, or profession-history
         const inventoryDisplay = document.querySelector('.inventory-display');
         const hasPlayerMarketContent = inventoryDisplay && inventoryDisplay.querySelector('#player-market-content');
         const hasMarketContent = inventoryDisplay && inventoryDisplay.querySelector('#market-content');
+        const hasProfessionContent = inventoryDisplay && inventoryDisplay.querySelector('#profession-history-content');
 
-        // Restore original inventory HTML if it was replaced by market view
+        // Restore original inventory HTML if it was replaced by market or profession view
         if (originalInventoryHTML) {
-            if (inventoryDisplay && hasMarketContent) {
-                // Replace market display with inventory display
+            if (inventoryDisplay && (hasMarketContent || hasProfessionContent)) {
+                // Replace market/profession display with inventory display
                 inventoryDisplay.outerHTML = originalInventoryHTML.inventoryDisplay;
             }
 
@@ -2548,8 +2562,8 @@ async function switchView(view) {
 
             // Re-render inventory
             viewer.render();
-        } else if (hasPlayerMarketContent) {
-            // Coming from player-market view, just re-render inventory
+        } else if (hasPlayerMarketContent || hasProfessionContent) {
+            // Coming from player-market or profession-history view, just re-render inventory
             viewer.setupDomElements();
             viewer.render();
         }
@@ -2559,6 +2573,16 @@ async function switchView(view) {
         // Hide inventory controls
         if (viewControlsSection) {
             viewControlsSection.style.display = 'none';
+        }
+
+        // Destroy profession charts if they exist
+        if (professionViewer.chartInstance) {
+            professionViewer.chartInstance.destroy();
+            professionViewer.chartInstance = null;
+        }
+        if (professionViewer.summaryChartInstance) {
+            professionViewer.summaryChartInstance.destroy();
+            professionViewer.summaryChartInstance = null;
         }
 
         // Market controls will be shown by renderMarketView
@@ -2576,6 +2600,16 @@ async function switchView(view) {
         // Remove market controls if present
         if (marketControlsSection) {
             marketControlsSection.remove();
+        }
+
+        // Destroy profession charts if they exist
+        if (professionViewer.chartInstance) {
+            professionViewer.chartInstance.destroy();
+            professionViewer.chartInstance = null;
+        }
+        if (professionViewer.summaryChartInstance) {
+            professionViewer.summaryChartInstance.destroy();
+            professionViewer.summaryChartInstance = null;
         }
 
         footer.style.display = 'none';
@@ -3285,6 +3319,18 @@ function escapeHtml(text) {
 async function renderProfessionHistoryView() {
     const inventoryDisplay = document.querySelector('.inventory-display');
     if (!inventoryDisplay) return;
+
+    // Store the original inventory sections before replacing them (only once)
+    if (!originalInventoryHTML) {
+        const viewControls = document.querySelector('.view-controls');
+
+        if (inventoryDisplay) {
+            originalInventoryHTML = {
+                inventoryDisplay: inventoryDisplay.outerHTML,
+                viewControls: viewControls ? viewControls.outerHTML : null
+            };
+        }
+    }
 
     // Static list of tracked players (matches Lambda configuration)
     const trackedPlayers = [

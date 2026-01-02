@@ -2511,7 +2511,7 @@ class ProfessionHistoryViewer {
                     },
                     title: {
                         display: true,
-                        text: 'Current Total XP by Skill',
+                        text: `Current Total XP by Skill - ${this.selectedPlayerName}`,
                         color: '#f3f4f6',
                         font: {
                             size: 14,
@@ -2542,8 +2542,14 @@ class ProfessionHistoryViewer {
     updateStatsDisplay(data) {
         const totalXpDisplay = document.getElementById('total-xp-display');
         const xpGainedDisplay = document.getElementById('xp-gained-display');
+        const statsTitle = document.getElementById('stats-title');
 
         if (!totalXpDisplay || !xpGainedDisplay) return;
+
+        // Update title with player name
+        if (statsTitle) {
+            statsTitle.textContent = `Total XP / XP Gained - ${this.selectedPlayerName}`;
+        }
 
         if (data.data.length === 0) {
             totalXpDisplay.textContent = '-';
@@ -3536,9 +3542,9 @@ async function renderProfessionHistoryView() {
                 <div class="chart-container" style="position: relative; height: 400px; flex: 0 0 25%;">
                     <canvas id="profession-pie-chart"></canvas>
                 </div>
-                <div style="flex: 0 0 25%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-secondary); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-subtle);">
+                <div class="chart-container" style="position: relative; height: 400px; flex: 0 0 25%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1.5rem;">
                     <div style="text-align: center;">
-                        <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1.5rem;">Total XP / XP Gained</div>
+                        <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1.5rem;" id="stats-title">Total XP / XP Gained</div>
                         <div id="total-xp-display" style="font-size: 2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">-</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1.5rem;">Current Total XP</div>
                         <div id="xp-gained-display" style="font-size: 1.5rem; font-weight: 600; color: var(--accent); margin-bottom: 0.5rem;">-</div>

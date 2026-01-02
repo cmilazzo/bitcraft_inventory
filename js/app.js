@@ -1057,8 +1057,7 @@ class InventoryViewer {
         this.playerList.innerHTML = Array.from(this.players.entries()).map(([entityId, data]) => {
             const isSelected = isPlayerMarketView && selectedPlayerId === entityId;
             return `
-                <div class="player-chip ${isSelected ? 'selected' : ''}"
-                     ${isPlayerMarketView ? `style="cursor: pointer;" onclick="loadPlayerMarketData('${entityId}')"` : ''}>
+                <div class="player-chip ${isSelected ? 'selected' : ''}">
                     <span>${this.escapeHtml(data.username)}</span>
                     <span>(${data.items.length} items)</span>
                     <button class="remove-btn" onclick="event.stopPropagation(); viewer.removePlayer('${entityId}')">&times;</button>

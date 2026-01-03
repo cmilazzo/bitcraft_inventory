@@ -1571,6 +1571,7 @@ class MarketViewer {
                     .filter(order => order.priceThreshold != null && order.priceThreshold > 0)
                     .map(order => ({
                         price: order.priceThreshold,
+                        quantity: parseInt(order.quantity) || 1,
                         seller: order.ownerUsername || 'Unknown',
                         claimName: order.claimName || 'Unknown',
                         regionName: order.regionName || 'Unknown',
@@ -1585,6 +1586,7 @@ class MarketViewer {
                     console.log(`[Item ${itemId}] Cheapest order:`, cheapestOrder);
                     return {
                         price: cheapestOrder.price,
+                        quantity: cheapestOrder.quantity,
                         seller: cheapestOrder.seller,
                         claimName: cheapestOrder.claimName,
                         regionName: cheapestOrder.regionName,
@@ -1641,12 +1643,14 @@ class MarketViewer {
                 const priceData = await this.fetchItemPrice(item.id);
                 if (priceData) {
                     item.price = priceData.price;
+                    item.quantity = priceData.quantity;
                     item.seller = priceData.seller;
                     item.claimName = priceData.claimName;
                     item.regionName = priceData.regionName;
                     item.regionId = priceData.regionId;
                 } else {
                     item.price = null;
+                    item.quantity = null;
                     item.seller = null;
                     item.claimName = null;
                     item.regionName = null;
@@ -3451,7 +3455,7 @@ async function renderMarketTable() {
                         <td class="seller-value">${item.seller || '<span class="loading-text">Loading...</span>'}</td>
                         <td class="location-value">${item.priceLoaded ? (item.claimName ? escapeHtml(item.claimName) : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
                         <td class="region-value">${item.priceLoaded ? (item.regionName ? `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="count-value">${item.sellOrders.toLocaleString()}</td>
+                        <td class="count-value">${item.priceLoaded && item.quantity != null ? item.quantity.toLocaleString() : '<span class="loading-text">Loading...</span>'}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -3490,6 +3494,7 @@ async function renderMarketTable() {
                 const sellerCell = row.querySelector('.seller-value');
                 const locationCell = row.querySelector('.location-value');
                 const regionCell = row.querySelector('.region-value');
+                const countCell = row.querySelector('.count-value');
 
                 if (priceCell) {
                     priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
@@ -3506,6 +3511,9 @@ async function renderMarketTable() {
                     } else {
                         regionCell.textContent = 'N/A';
                     }
+                }
+                if (countCell) {
+                    countCell.textContent = item.quantity != null ? item.quantity.toLocaleString() : 'N/A';
                 }
             }
         });

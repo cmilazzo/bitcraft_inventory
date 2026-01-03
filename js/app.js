@@ -1582,15 +1582,26 @@ class MarketViewer {
                 console.log(`[Item ${itemId}] Orders with prices:`, ordersWithPrices);
 
                 if (ordersWithPrices.length > 0) {
-                    const cheapestOrder = ordersWithPrices[0];
-                    console.log(`[Item ${itemId}] Cheapest order:`, cheapestOrder);
+                    const cheapestPrice = ordersWithPrices[0].price;
+
+                    // Find all orders at the cheapest price
+                    const ordersAtCheapestPrice = ordersWithPrices.filter(order => order.price === cheapestPrice);
+
+                    // Sum up quantities from all orders at the cheapest price
+                    const totalQuantity = ordersAtCheapestPrice.reduce((sum, order) => sum + order.quantity, 0);
+
+                    // Use the first order's location/seller info
+                    const firstOrder = ordersAtCheapestPrice[0];
+
+                    console.log(`[Item ${itemId}] Cheapest price: ${cheapestPrice}, Orders at this price: ${ordersAtCheapestPrice.length}, Total quantity: ${totalQuantity}`);
+
                     return {
-                        price: cheapestOrder.price,
-                        quantity: cheapestOrder.quantity,
-                        seller: cheapestOrder.seller,
-                        claimName: cheapestOrder.claimName,
-                        regionName: cheapestOrder.regionName,
-                        regionId: cheapestOrder.regionId
+                        price: cheapestPrice,
+                        quantity: totalQuantity,
+                        seller: firstOrder.seller,
+                        claimName: firstOrder.claimName,
+                        regionName: firstOrder.regionName,
+                        regionId: firstOrder.regionId
                     };
                 }
             }

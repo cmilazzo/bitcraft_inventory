@@ -2963,32 +2963,49 @@ async function renderPlayerMarketView() {
 
     // Check URL for player parameter (from bookmark)
     const urlParams = new URLSearchParams(window.location.search);
-    const urlPlayerId = urlParams.get('player');
+    let urlPlayerIds = [];
 
-    // If URL has a player ID, ensure it's loaded
-    if (urlPlayerId && !viewer.players.has(urlPlayerId)) {
-        // Player from bookmark isn't loaded yet, need to fetch them first
-        try {
-            document.getElementById('loading-overlay').classList.remove('hidden');
-            const response = await fetch(`https://game.bitcraft.gg/api/players/${urlPlayerId}/__data.json?_data=routes%2Fapi.players.%24playerId`);
-            const data = await response.json();
-            const playerData = data.player;
+    // Check for 'player' (singular) parameter
+    const playerParam = urlParams.get('player');
+    if (playerParam) {
+        urlPlayerIds.push(playerParam);
+    }
 
-            if (playerData) {
-                const username = playerData.character?.name || 'Unknown Player';
-                const items = await viewer.fetchPlayerInventory(urlPlayerId);
-                viewer.players.set(urlPlayerId, { username, items });
-                viewer.renderPlayerList();
-                await loadPlayerMarketData(urlPlayerId);
+    // Also check for 'players' (plural) parameter used by inventory view
+    const playersParam = urlParams.get('players');
+    if (playersParam) {
+        urlPlayerIds = playersParam.split(',').map(id => id.trim()).filter(id => id);
+    }
+
+    // If URL has player IDs, load them
+    if (urlPlayerIds.length > 0) {
+        document.getElementById('loading-overlay').classList.remove('hidden');
+
+        // Load all players from URL
+        for (const playerId of urlPlayerIds) {
+            if (!viewer.players.has(playerId)) {
+                try {
+                    const response = await fetch(`https://game.bitcraft.gg/api/players/${playerId}/__data.json?_data=routes%2Fapi.players.%24playerId`);
+                    const data = await response.json();
+                    const playerData = data.player;
+
+                    if (playerData) {
+                        const username = playerData.character?.name || 'Unknown Player';
+                        const items = await viewer.fetchPlayerInventory(playerId);
+                        viewer.players.set(playerId, { username, items });
+                    }
+                } catch (error) {
+                    console.error('Error loading player from URL:', error);
+                }
             }
-            document.getElementById('loading-overlay').classList.add('hidden');
-        } catch (error) {
-            console.error('Error loading player from URL:', error);
-            document.getElementById('loading-overlay').classList.add('hidden');
         }
-    } else if (urlPlayerId && viewer.players.has(urlPlayerId)) {
-        // Player from bookmark is already loaded, just show their data
-        await loadPlayerMarketData(urlPlayerId);
+
+        viewer.renderPlayerList();
+
+        // Load market data for the first player
+        await loadPlayerMarketData(urlPlayerIds[0]);
+
+        document.getElementById('loading-overlay').classList.add('hidden');
     } else if (viewer.players.size > 0 && !playerMarketViewer.selectedPlayer) {
         // No URL parameter, but players are loaded - load the first one
         const firstPlayerId = viewer.players.keys().next().value;

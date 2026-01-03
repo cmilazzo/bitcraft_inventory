@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://t1sveo7mdf.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0018';
+const VERSION = '1.0019';
 
 // Current view state
 let currentView = 'inventory';

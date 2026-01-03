@@ -2961,8 +2961,36 @@ async function renderPlayerMarketView() {
         `;
     }
 
-    // If there are already players loaded and no player is currently selected, load the first one
-    if (viewer.players.size > 0 && !playerMarketViewer.selectedPlayer) {
+    // Check URL for player parameter (from bookmark)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPlayerId = urlParams.get('player');
+
+    // If URL has a player ID, ensure it's loaded
+    if (urlPlayerId && !viewer.players.has(urlPlayerId)) {
+        // Player from bookmark isn't loaded yet, need to fetch them first
+        try {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            const response = await fetch(`https://game.bitcraft.gg/api/players/${urlPlayerId}/__data.json?_data=routes%2Fapi.players.%24playerId`);
+            const data = await response.json();
+            const playerData = data.player;
+
+            if (playerData) {
+                const username = playerData.character?.name || 'Unknown Player';
+                const items = await viewer.fetchPlayerInventory(urlPlayerId);
+                viewer.players.set(urlPlayerId, { username, items });
+                viewer.renderPlayerList();
+                await loadPlayerMarketData(urlPlayerId);
+            }
+            document.getElementById('loading-overlay').classList.add('hidden');
+        } catch (error) {
+            console.error('Error loading player from URL:', error);
+            document.getElementById('loading-overlay').classList.add('hidden');
+        }
+    } else if (urlPlayerId && viewer.players.has(urlPlayerId)) {
+        // Player from bookmark is already loaded, just show their data
+        await loadPlayerMarketData(urlPlayerId);
+    } else if (viewer.players.size > 0 && !playerMarketViewer.selectedPlayer) {
+        // No URL parameter, but players are loaded - load the first one
         const firstPlayerId = viewer.players.keys().next().value;
         await loadPlayerMarketData(firstPlayerId);
     } else if (viewer.players.size > 0 && playerMarketViewer.selectedPlayer) {

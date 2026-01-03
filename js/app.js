@@ -2946,19 +2946,28 @@ async function renderPlayerMarketView() {
         return;
     }
 
-    // Replace content with player market view
-    inventoryDisplay.innerHTML = `
-        <div id="player-market-content" style="background: var(--bg-secondary); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-subtle); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);">
-            <p style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                Select a player from above to view their market orders.
-            </p>
-        </div>
-    `;
+    // Check if player-market content already exists
+    const existingMarketContent = document.getElementById('player-market-content');
 
-    // If there are already players loaded, render for the first one
-    if (viewer.players.size > 0) {
+    // Only replace content if it doesn't exist or if there's no selected player
+    if (!existingMarketContent) {
+        // Replace content with player market view
+        inventoryDisplay.innerHTML = `
+            <div id="player-market-content" style="background: var(--bg-secondary); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-subtle); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);">
+                <p style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    Select a player from above to view their market orders.
+                </p>
+            </div>
+        `;
+    }
+
+    // If there are already players loaded and no player is currently selected, load the first one
+    if (viewer.players.size > 0 && !playerMarketViewer.selectedPlayer) {
         const firstPlayerId = viewer.players.keys().next().value;
         await loadPlayerMarketData(firstPlayerId);
+    } else if (viewer.players.size > 0 && playerMarketViewer.selectedPlayer) {
+        // If a player is already selected, re-render their data
+        await loadPlayerMarketData(playerMarketViewer.selectedPlayer.id);
     }
 }
 

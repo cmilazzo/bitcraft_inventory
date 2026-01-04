@@ -7,14 +7,16 @@ lambda-api/
 lambda-poller.zip
 lambda-api.zip
 lambda-poller-updated.zip
-lambda-test-output*.json
-lambda-test-output*.txt
+lambda-*-output*.json
+lambda-*-output*.txt
 
 # AWS Configuration
 lambda-trust-policy.json
 lambda-env.json
 dynamodb-read-policy.json
 dynamodb-write-policy.json
+cloudwatch-policy.json
+dashboard-config.json
 
 # Temp files
 nul

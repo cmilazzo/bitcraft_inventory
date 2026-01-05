@@ -2396,7 +2396,7 @@ class ProfessionHistoryViewer {
                         },
                         title: {
                             display: true,
-                            text: [`XP Gains per Skill - ${this.selectedPlayerName}`, 'No XP gains in the selected time range'],
+                            text: `XP Gains per Skill - ${this.selectedPlayerName}`,
                             color: '#f3f4f6',
                             font: {
                                 size: 16,
@@ -2404,7 +2404,21 @@ class ProfessionHistoryViewer {
                             },
                             padding: {
                                 top: 10,
-                                bottom: 20
+                                bottom: 5
+                            }
+                        },
+                        subtitle: {
+                            display: true,
+                            text: 'No XP gains in the selected time range',
+                            color: '#9ca3af',
+                            font: {
+                                size: 13,
+                                weight: 'normal',
+                                style: 'italic'
+                            },
+                            padding: {
+                                top: 0,
+                                bottom: 15
                             }
                         },
                         tooltip: {

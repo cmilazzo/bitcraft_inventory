@@ -2151,7 +2151,7 @@ class ProfessionHistoryViewer {
             backgroundColor: colors[i % colors.length] + '20',
             borderWidth: 2,
             tension: 0.4,
-            pointRadius: 2,
+            pointRadius: 0,
             pointHoverRadius: 5,
             yAxisID: 'y'
         }));

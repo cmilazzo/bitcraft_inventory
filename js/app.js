@@ -2354,29 +2354,74 @@ class ProfessionHistoryViewer {
             '#f97316', '#6366f1', '#14b8a6', '#a855f7'
         ];
 
-        // Calculate total gains (last - first data point)
-        if (data.data.length < 2) {
-            summaryCanvas.style.display = 'none';
-            return;
-        }
-
-        const firstPoint = data.data[0];
-        const lastPoint = data.data[data.data.length - 1];
-
-        const gains = professions.map((prof, index) => ({
-            profession: prof,
-            gain: (lastPoint[prof] || 0) - (firstPoint[prof] || 0),
-            color: colors[index % colors.length]
-        })).filter(item => item.gain > 0)
-          .sort((a, b) => b.gain - a.gain);
-
-        if (gains.length === 0) {
-            summaryCanvas.style.display = 'none';
-            return;
-        }
-
         if (this.summaryChartInstance) {
             this.summaryChartInstance.destroy();
+        }
+
+        // Calculate total gains (last - first data point)
+        let gains = [];
+        if (data.data.length >= 2) {
+            const firstPoint = data.data[0];
+            const lastPoint = data.data[data.data.length - 1];
+
+            gains = professions.map((prof, index) => ({
+                profession: prof,
+                gain: (lastPoint[prof] || 0) - (firstPoint[prof] || 0),
+                color: colors[index % colors.length]
+            })).filter(item => item.gain > 0)
+              .sort((a, b) => b.gain - a.gain);
+        }
+
+        // If no gains or insufficient data, show empty state with message
+        if (gains.length === 0) {
+            this.summaryChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['No Data'],
+                    datasets: [{
+                        label: 'XP Gained',
+                        data: [0],
+                        backgroundColor: '#374151',
+                        borderColor: '#4b5563',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: [`XP Gains per Skill - ${this.selectedPlayerName}`, 'No XP gains in the selected time range'],
+                            color: '#f3f4f6',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                top: 10,
+                                bottom: 20
+                            }
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }
+                }
+            });
+            return;
         }
 
         this.summaryChartInstance = new Chart(ctx, {

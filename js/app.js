@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://t1sveo7mdf.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0021';
+const VERSION = '1.0022';
 
 // Current view state
 let currentView = 'inventory';
@@ -1524,64 +1524,27 @@ class MarketViewer {
             console.log(`[Item ${itemId}] Decoded keys:`, decoded ? Object.keys(decoded) : 'null');
 
             if (!decoded) {
-                console.log(`[Item ${itemId}] No decoded data`);
                 return null;
             }
 
-            // Try different possible locations for sellOrders
-            let sellOrders = null;
+            const sellOrders = decoded.marketItem?.sellOrders;
 
-            // Check if sellOrders is directly accessible
-            if (decoded.sellOrders && Array.isArray(decoded.sellOrders)) {
-                sellOrders = decoded.sellOrders;
-                console.log(`[Item ${itemId}] Found sellOrders directly`);
-            }
-            // Check if it's nested in item
-            else if (decoded.item && decoded.item.sellOrders && Array.isArray(decoded.item.sellOrders)) {
-                sellOrders = decoded.item.sellOrders;
-                console.log(`[Item ${itemId}] Found sellOrders in item`);
-            }
-            // Check if it's in marketItem
-            else if (decoded.marketItem && decoded.marketItem.sellOrders && Array.isArray(decoded.marketItem.sellOrders)) {
-                sellOrders = decoded.marketItem.sellOrders;
-                console.log(`[Item ${itemId}] Found sellOrders in marketItem`);
-            }
-            // It might be in marketData for this endpoint
-            else if (decoded.marketData) {
-                console.log(`[Item ${itemId}] Checking marketData...`);
-                // Check if the individual item endpoint uses the same structure as market list
-                if (decoded.marketData.items) {
-                    const item = decoded.marketData.items.find(i => i.id === itemId);
-                    if (item && item.sellOrders && Array.isArray(item.sellOrders)) {
-                        sellOrders = item.sellOrders;
-                        console.log(`[Item ${itemId}] Found sellOrders in marketData.items`);
-                    }
-                } else if (decoded.marketData.sellOrders && Array.isArray(decoded.marketData.sellOrders)) {
-                    sellOrders = decoded.marketData.sellOrders;
-                    console.log(`[Item ${itemId}] Found sellOrders in marketData`);
-                }
-            }
-
-            if (!sellOrders) {
-                console.log(`[Item ${itemId}] Could not find sellOrders array`);
+            if (!Array.isArray(sellOrders) || sellOrders.length === 0) {
                 return null;
             }
 
             if (sellOrders.length > 0) {
-                console.log(`[Item ${itemId}] Found ${sellOrders.length} sell orders`);
-                console.log(`[Item ${itemId}] First order:`, sellOrders[0]);
-
                 // Extract prices from priceThreshold property and find the lowest
                 const ordersWithPrices = sellOrders
-                    .filter(order => order.priceThreshold != null && order.priceThreshold > 0)
                     .map(order => ({
-                        price: order.priceThreshold,
+                        price: parseFloat(order.priceThreshold),
                         quantity: parseInt(order.quantity) || 1,
                         seller: order.ownerUsername || 'Unknown',
                         claimName: order.claimName || 'Unknown',
                         regionName: order.regionName || 'Unknown',
                         regionId: order.regionId || null
                     }))
+                    .filter(order => !isNaN(order.price) && order.price > 0)
                     .sort((a, b) => a.price - b.price);
 
                 console.log(`[Item ${itemId}] Orders with prices:`, ordersWithPrices);
@@ -1619,32 +1582,8 @@ class MarketViewer {
     }
 
     async loadPricesForVisibleItems(items) {
-        console.log('[loadPricesForVisibleItems] Called with', items.length, 'items');
-
-        // Debug: check first few items
-        if (items.length > 0) {
-            console.log('[loadPricesForVisibleItems] First 3 items check:');
-            items.slice(0, 3).forEach((item, i) => {
-                console.log(`  Item ${i}: id=${item.id}, sellOrders=${item.sellOrders} (${typeof item.sellOrders}), priceLoaded=${item.priceLoaded}`);
-            });
-        }
-
         // Only fetch prices for items that don't have them yet
-        const itemsNeedingPrices = items.filter(item => {
-            const needsPrice = !item.priceLoaded && item.sellOrders > 0;
-            return needsPrice;
-        });
-
-        console.log(`[loadPricesForVisibleItems] Total items: ${items.length}, Items needing prices: ${itemsNeedingPrices.length}`);
-        if (itemsNeedingPrices.length > 0) {
-            console.log('[loadPricesForVisibleItems] First item needing price:', itemsNeedingPrices[0]);
-        } else {
-            console.log('[loadPricesForVisibleItems] No items need prices. Reasons:');
-            const alreadyLoaded = items.filter(item => item.priceLoaded).length;
-            const noSellOrders = items.filter(item => !item.sellOrders || item.sellOrders === 0).length;
-            console.log(`  - Already loaded: ${alreadyLoaded}`);
-            console.log(`  - No sell orders: ${noSellOrders}`);
-        }
+        const itemsNeedingPrices = items.filter(item => !item.priceLoaded && item.hasSellOrders);
 
         if (itemsNeedingPrices.length === 0) {
             return;
@@ -1654,7 +1593,6 @@ class MarketViewer {
         const batchSize = 10;
         for (let i = 0; i < itemsNeedingPrices.length; i += batchSize) {
             const batch = itemsNeedingPrices.slice(i, i + batchSize);
-            console.log(`Fetching prices for batch ${i / batchSize + 1}, ${batch.length} items`);
             await Promise.all(batch.map(async (item) => {
                 const priceData = await this.fetchItemPrice(item.id);
                 if (priceData) {

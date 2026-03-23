@@ -1482,12 +1482,13 @@ class MarketViewer {
 
             for (const item of itemsArray) {
                 if (item && typeof item === 'object' && item.name) {
+                    const dbItem = item.id ? viewer.itemDatabase.get(String(item.id)) : null;
                     items.push({
                         id: item.id || '',
                         name: item.name || 'Unknown',
                         tier: item.tier ?? 0,
                         rarity: item.rarityStr || item.rarity || 'Common',
-                        tag: item.tag || 'Unknown',
+                        tag: item.tag || (dbItem && dbItem.tag) || 'Unknown',
                         hasSellOrders: item.hasSellOrders || false,
                         hasBuyOrders: item.hasBuyOrders || false,
                         sellOrders: item.sellOrders || 0,

@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://t1sveo7mdf.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0020';
+const VERSION = '1.0021';
 
 // Current view state
 let currentView = 'inventory';
@@ -1456,7 +1456,20 @@ class MarketViewer {
         // Market data structure: the decoded data has a marketData property containing items
         const items = [];
 
-        console.log('Extracting from data:', data);
+        // Build id->tag map from categories (items have no tag field, only itemType number)
+        const idToTag = new Map();
+        const categories = data?.marketData?.categories;
+        if (Array.isArray(categories)) {
+            for (const cat of categories) {
+                if (cat && cat.name && Array.isArray(cat.items)) {
+                    for (const catItem of cat.items) {
+                        if (catItem && catItem.id) {
+                            idToTag.set(String(catItem.id), cat.name);
+                        }
+                    }
+                }
+            }
+        }
 
         // Try to get the items array from different possible locations
         let itemsArray = null;
@@ -1471,24 +1484,15 @@ class MarketViewer {
             itemsArray = data.marketData;
         }
 
-        console.log('Items array found:', itemsArray ? itemsArray.length : 'null');
-
         if (itemsArray) {
-            // Log first item to see structure
-            if (itemsArray.length > 0) {
-                console.log('First item in array:', itemsArray[0]);
-                console.log('Item keys:', Object.keys(itemsArray[0]));
-            }
-
             for (const item of itemsArray) {
                 if (item && typeof item === 'object' && item.name) {
-                    const dbItem = item.id ? viewer.itemDatabase.get(String(item.id)) : null;
                     items.push({
                         id: item.id || '',
                         name: item.name || 'Unknown',
                         tier: item.tier ?? 0,
                         rarity: item.rarityStr || item.rarity || 'Common',
-                        tag: item.tag || (dbItem && dbItem.tag) || 'Unknown',
+                        tag: idToTag.get(String(item.id)) || 'Unknown',
                         hasSellOrders: item.hasSellOrders || false,
                         hasBuyOrders: item.hasBuyOrders || false,
                         sellOrders: item.sellOrders || 0,

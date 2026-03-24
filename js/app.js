@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://t1sveo7mdf.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0022';
+const VERSION = '1.0024';
 
 // Current view state
 let currentView = 'inventory';
@@ -3557,18 +3557,9 @@ async function renderProfessionHistoryView() {
 
     // Static list of tracked players (matches Lambda configuration)
     const trackedPlayers = [
-        { id: '648518346386713124', name: 'Bulge' },
-        { id: '648518346396632661', name: 'LiverWurst' },
-        { id: '360287970289767980', name: 'OracleDelphi' },
-        { id: '216172782249268159', name: 'Goal' },
-        { id: '144115188155088129', name: 'Storm8' },
-        { id: '432345564400733908', name: 'OracleSCV' },
-        { id: '504403158317668275', name: 'OrcPeon' },
-        { id: '648518346371588437', name: 'OnyxxynO' },
-        { id: '576460752432286687', name: 'deirdresm' },
-        { id: '504403158276537417', name: 'WinterAurelius' },
-        { id: '648518346352847871', name: 'Andromedia' },
-        { id: '648518346363192336', name: 'Zephrim' }
+        { id: '1297036692700882015', name: 'sc00by' },
+        { id: '504403158281515721', name: 'sn0rtle' },
+        { id: '1008806316548767925', name: 'sh0nuff' }
     ];
 
     // Read URL parameters
@@ -3576,8 +3567,9 @@ async function renderProfessionHistoryView() {
     const urlPlayer = urlParams.get('player');
     const urlHours = urlParams.get('hours');
 
-    // Set initial values from URL or defaults
-    const initialPlayer = urlPlayer || trackedPlayers[0].id;
+    // Set initial values from URL or defaults (validate URL player is in tracked list)
+    const isValidPlayer = trackedPlayers.some(p => p.id === urlPlayer);
+    const initialPlayer = (urlPlayer && isValidPlayer) ? urlPlayer : trackedPlayers[0].id;
     const initialHours = urlHours ? parseInt(urlHours) : 1;
 
     // Create the profession history HTML

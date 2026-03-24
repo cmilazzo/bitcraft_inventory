@@ -2,8 +2,8 @@
 // Fetches data from bitjita.com API and displays aggregated inventory
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
-const PROFESSION_API = 'https://t1sveo7mdf.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0024';
+const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
+const VERSION = '1.0025';
 
 // Current view state
 let currentView = 'inventory';

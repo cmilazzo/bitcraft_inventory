@@ -2153,6 +2153,7 @@ class ProfessionHistoryViewer {
                         type: 'time',
                         time: {
                             unit: this.timeRange <= 6 ? 'minute' : (this.timeRange > 168 ? 'day' : 'hour'),
+                            stepSize: this.timeRange <= 6 ? 2 : 1,
                             displayFormats: {
                                 minute: 'HH:mm',
                                 hour: 'MMM d, HH:mm',

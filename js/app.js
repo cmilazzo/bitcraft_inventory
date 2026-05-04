@@ -2082,10 +2082,12 @@ class ProfessionHistoryViewer {
             '#f97316', '#6366f1', '#14b8a6', '#a855f7'
         ];
 
-        // Snap raw data into 2-minute buckets so irregular poll timestamps
-        // (from before aligned storage was in place) display as a consistent grid.
-        // Within each bucket keep the last reading (highest timestamp = most current).
-        const BUCKET_SECONDS = 120;
+        // Bucket raw data to match the chart's visual tick interval exactly —
+        // one bucket per tick means every bar slot is filled with no gaps.
+        //   ≤6h  → 5-min buckets  (stepSize:5 minutes)
+        //   24h  → 1-hour buckets (stepSize:1 hour)
+        //   7d+  → 1-day buckets  (stepSize:1 day)
+        const BUCKET_SECONDS = this.timeRange <= 6 ? 300 : (this.timeRange > 168 ? 86400 : 3600);
         const bucketMap = new Map();
         for (const point of data.data) {
             const bucket = Math.floor(point.timestamp / BUCKET_SECONDS) * BUCKET_SECONDS;
@@ -2166,7 +2168,7 @@ class ProfessionHistoryViewer {
                         type: 'time',
                         time: {
                             unit: this.timeRange <= 6 ? 'minute' : (this.timeRange > 168 ? 'day' : 'hour'),
-                            stepSize: this.timeRange <= 6 ? 2 : 1,
+                            stepSize: this.timeRange <= 6 ? 5 : 1,
                             displayFormats: {
                                 minute: 'HH:mm',
                                 hour: 'MMM d, HH:mm',

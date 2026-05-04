@@ -2167,8 +2167,13 @@ class ProfessionHistoryViewer {
                     x: {
                         type: 'time',
                         time: {
-                            unit: this.timeRange <= 6 ? 'minute' : (this.timeRange > 168 ? 'day' : 'hour'),
-                            stepSize: this.timeRange <= 6 ? 5 : 1,
+                            // For short views: omit 'unit' so Chart.js derives bar width
+                            // from actual data point spacing (5-min buckets → 5-min-wide
+                            // bars → continuous). Explicit 'minute' forces 1-min-wide bars.
+                            // For longer views explicit unit keeps tick labels readable.
+                            ...(this.timeRange <= 6
+                                ? { minUnit: 'minute', stepSize: 5 }
+                                : { unit: this.timeRange > 168 ? 'day' : 'hour' }),
                             displayFormats: {
                                 minute: 'HH:mm',
                                 hour: 'MMM d, HH:mm',

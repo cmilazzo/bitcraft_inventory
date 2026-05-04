@@ -2082,10 +2082,23 @@ class ProfessionHistoryViewer {
             '#f97316', '#6366f1', '#14b8a6', '#a855f7'
         ];
 
+        // Snap raw data into 2-minute buckets so irregular poll timestamps
+        // (from before aligned storage was in place) display as a consistent grid.
+        // Within each bucket keep the last reading (highest timestamp = most current).
+        const BUCKET_SECONDS = 120;
+        const bucketMap = new Map();
+        for (const point of data.data) {
+            const bucket = Math.floor(point.timestamp / BUCKET_SECONDS) * BUCKET_SECONDS;
+            if (!bucketMap.has(bucket) || point.timestamp >= bucketMap.get(bucket).timestamp) {
+                bucketMap.set(bucket, { ...point, timestamp: bucket });
+            }
+        }
+        const chartData = Array.from(bucketMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+
         // Create line datasets for total XP
         const lineDatasets = professions.map((prof, i) => ({
             label: prof.charAt(0).toUpperCase() + prof.slice(1),
-            data: data.data.map(point => ({
+            data: chartData.map(point => ({
                 x: point.timestamp * 1000,
                 y: point[prof] || 0
             })),
@@ -2101,9 +2114,9 @@ class ProfessionHistoryViewer {
 
         // Calculate XP per minute for bar chart
         const xpPerMinData = [];
-        for (let i = 1; i < data.data.length; i++) {
-            const current = data.data[i];
-            const previous = data.data[i - 1];
+        for (let i = 1; i < chartData.length; i++) {
+            const current = chartData[i];
+            const previous = chartData[i - 1];
             const timeDiffMinutes = (current.timestamp - previous.timestamp) / 60;
 
             const xpRates = { timestamp: current.timestamp * 1000 };
@@ -2273,14 +2286,16 @@ class ProfessionHistoryViewer {
             }
         });
 
+        const bucketedData = { ...data, data: chartData };
+
         // Render summary chart
-        this.renderSummaryChart(data);
+        this.renderSummaryChart(bucketedData);
 
         // Render pie chart
-        this.renderPieChart(data);
+        this.renderPieChart(bucketedData);
 
         // Update stats display
-        this.updateStatsDisplay(data);
+        this.updateStatsDisplay(bucketedData);
     }
 
     renderSummaryChart(data) {

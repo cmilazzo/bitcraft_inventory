@@ -2097,13 +2097,22 @@ class ProfessionHistoryViewer {
         }
         const chartData = Array.from(bucketMap.values()).sort((a, b) => a.timestamp - b.timestamp);
 
-        // Create line datasets for total XP
+        // Format bucket timestamps as readable labels for the category axis
+        const formatLabel = (ts) => {
+            const d = new Date(ts * 1000);
+            const hh = d.getHours().toString().padStart(2, '0');
+            const mm = d.getMinutes().toString().padStart(2, '0');
+            const time = `${hh}:${mm}`;
+            if (this.timeRange <= 6) return time;
+            const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return this.timeRange > 168 ? date : `${date} ${time}`;
+        };
+        const labels = chartData.map(p => formatLabel(p.timestamp));
+
+        // Create line datasets for total XP (index-aligned with labels)
         const lineDatasets = professions.map((prof, i) => ({
             label: prof.charAt(0).toUpperCase() + prof.slice(1),
-            data: chartData.map(point => ({
-                x: point.timestamp * 1000,
-                y: point[prof] || 0
-            })),
+            data: chartData.map(point => point[prof] || 0),
             type: 'line',
             borderColor: colors[i % colors.length],
             backgroundColor: colors[i % colors.length] + '20',
@@ -2114,28 +2123,22 @@ class ProfessionHistoryViewer {
             yAxisID: 'y'
         }));
 
-        // Calculate XP per minute for bar chart
-        const xpPerMinData = [];
+        // Calculate XP per minute rates (N-1 values; prepend 0 to align with N labels)
+        const xpRatesPerLabel = professions.reduce((acc, prof) => { acc[prof] = [0]; return acc; }, {});
         for (let i = 1; i < chartData.length; i++) {
             const current = chartData[i];
             const previous = chartData[i - 1];
             const timeDiffMinutes = (current.timestamp - previous.timestamp) / 60;
-
-            const xpRates = { timestamp: current.timestamp * 1000 };
             professions.forEach(prof => {
                 const xpDiff = (current[prof] || 0) - (previous[prof] || 0);
-                xpRates[prof] = timeDiffMinutes > 0 ? xpDiff / timeDiffMinutes : 0;
+                xpRatesPerLabel[prof].push(timeDiffMinutes > 0 ? xpDiff / timeDiffMinutes : 0);
             });
-            xpPerMinData.push(xpRates);
         }
 
-        // Create stacked bar datasets for XP/min
+        // Create stacked bar datasets for XP/min (index-aligned with labels)
         const barDatasets = professions.map((prof, i) => ({
             label: prof.charAt(0).toUpperCase() + prof.slice(1) + ' (XP/min)',
-            data: xpPerMinData.map(point => ({
-                x: point.timestamp,
-                y: point[prof] || 0
-            })),
+            data: xpRatesPerLabel[prof],
             type: 'bar',
             backgroundColor: colors[i % colors.length] + '80',
             borderColor: colors[i % colors.length],
@@ -2154,7 +2157,7 @@ class ProfessionHistoryViewer {
 
         this.chartInstance = new Chart(ctx, {
             type: 'bar',
-            data: { datasets },
+            data: { labels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -2165,22 +2168,7 @@ class ProfessionHistoryViewer {
                 },
                 scales: {
                     x: {
-                        type: 'time',
-                        time: {
-                            // For short views: omit 'unit' so Chart.js derives bar width
-                            // from actual data point spacing (5-min buckets → 5-min-wide
-                            // bars → continuous). Explicit 'minute' forces 1-min-wide bars.
-                            // For longer views explicit unit keeps tick labels readable.
-                            ...(this.timeRange <= 6
-                                ? { minUnit: 'minute', stepSize: 5 }
-                                : { unit: this.timeRange > 168 ? 'day' : 'hour' }),
-                            displayFormats: {
-                                minute: 'HH:mm',
-                                hour: 'MMM d, HH:mm',
-                                day: 'MMM d'
-                            }
-                        },
-                        offset: false,
+                        type: 'category',
                         title: {
                             display: true,
                             text: 'Time',
@@ -2190,7 +2178,10 @@ class ProfessionHistoryViewer {
                             color: '#374151'
                         },
                         ticks: {
-                            color: '#9ca3af'
+                            color: '#9ca3af',
+                            maxRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 12
                         }
                     },
                     y: {

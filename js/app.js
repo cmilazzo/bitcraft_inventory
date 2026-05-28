@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0026';
+const VERSION = '1.0027';
 
 // Current view state
 let currentView = 'inventory';
@@ -1787,14 +1787,15 @@ class PlayerMarketViewer {
 
     async fetchPlayerMarketData(playerId) {
         const response = await fetch(
-            `${API_BASE}/api/market/player/${playerId}`
+            `${API_BASE}/api/market/player/${playerId}/__data.json?x-sveltekit-invalidated=001`
         );
 
         if (!response.ok) {
             throw new Error(`Failed to fetch market data: ${response.status}`);
         }
 
-        const data = await response.json();
+        const json = await response.json();
+        const data = this.decodeSvelteKitData(json);
 
         if (!data) {
             throw new Error('No market data returned');

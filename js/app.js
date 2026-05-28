@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0030';
+const VERSION = '1.0031';
 
 // Current view state
 let currentView = 'inventory';
@@ -1820,9 +1820,9 @@ class PlayerMarketViewer {
             entityId: order.entityId,
             itemId: order.itemId,
             itemName: order.itemName || 'Unknown',
-            itemTier: order.itemTier,
-            itemRarity: order.itemRarityStr || 'Common',
-            itemTag: order.itemTag,
+            itemTier: order.tier ?? order.itemTier,
+            itemRarity: order.rarityStr || order.itemRarityStr || 'Common',
+            itemTag: order.tag || order.itemTag,
             quantity: parseInt(order.quantity) || 0,
             price: parseInt(order.priceThreshold) || 0,
             claimName: order.claimName,
@@ -1888,9 +1888,9 @@ class PlayerMarketViewer {
             entityId: order.entityId,
             itemId: order.itemId,
             itemName: order.itemName || 'Unknown',
-            itemTier: order.itemTier,
-            itemRarity: order.itemRarityStr || 'Common',
-            itemTag: order.itemTag,
+            itemTier: order.tier ?? order.itemTier,
+            itemRarity: order.rarityStr || order.itemRarityStr || 'Common',
+            itemTag: order.tag || order.itemTag,
             quantity: parseInt(order.quantity) || 0,
             price: parseInt(order.priceThreshold) || 0,
             claimName: order.claimName,

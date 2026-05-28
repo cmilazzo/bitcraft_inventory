@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0029';
+const VERSION = '1.0030';
 
 // Current view state
 let currentView = 'inventory';
@@ -1801,15 +1801,16 @@ class PlayerMarketViewer {
             throw new Error('No market data returned');
         }
 
-        // Store player info
+        // Store player info — playerId comes from the caller, not the response
         this.selectedPlayer = {
-            id: data.playerId,
-            username: data.playerUsername
+            id: playerId,
+            username: viewer.players.get(playerId)?.username || playerId
         };
 
-        // Parse sell orders and buy orders
-        this.parseSellOrders(data.sellOrders || []);
-        this.parseBuyOrders(data.buyOrders || []);
+        // Response shape: { marketOrders: { sellOrders: [...], buyOrders: [...] } }
+        const orders = data.marketOrders || data;
+        this.parseSellOrders(orders.sellOrders || []);
+        this.parseBuyOrders(orders.buyOrders || []);
 
         return data;
     }

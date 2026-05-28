@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0031';
+const VERSION = '1.0032';
 
 // Current view state
 let currentView = 'inventory';
@@ -3146,7 +3146,7 @@ function renderOrdersTable(orders, type) {
 
                     return `
                         <tr class="rarity-row-${rarity} ${isSellOrders ? 'market-row-clickable' : ''}"
-                            ${isSellOrders ? `onclick="showMarketDetails(${order.itemId})" style="cursor: pointer;"` : ''}>
+                            ${isSellOrders ? `onclick="showMarketDetails('${order.itemId}')" style="cursor: pointer;"` : ''}>
                             <td class="item-name">${escapeHtml(order.itemName)}</td>
                             <td><span class="tier-badge">T${order.itemTier}</span></td>
                             <td><span class="rarity-${rarity}">${order.itemRarity || 'Common'}</span></td>

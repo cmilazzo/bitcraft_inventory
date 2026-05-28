@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0028';
+const VERSION = '1.0029';
 
 // Current view state
 let currentView = 'inventory';
@@ -1795,7 +1795,7 @@ class PlayerMarketViewer {
         }
 
         const json = await response.json();
-        const data = this.decodeSvelteKitData(json);
+        const data = viewer.decodeSvelteKitData(json);
 
         if (!data) {
             throw new Error('No market data returned');

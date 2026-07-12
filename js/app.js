@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0032';
+const VERSION = '1.0033';
 
 // Current view state
 let currentView = 'inventory';
@@ -1471,17 +1471,20 @@ class MarketViewer {
             }
         }
 
-        // Try to get the items array from different possible locations
+        // Items are nested inside categories — flatten them all
         let itemsArray = null;
 
         if (Array.isArray(data)) {
             itemsArray = data;
-        } else if (data && data.marketData && data.marketData.items && Array.isArray(data.marketData.items)) {
+        } else if (data?.marketData?.items && Array.isArray(data.marketData.items)) {
             itemsArray = data.marketData.items;
-        } else if (data && data.items && Array.isArray(data.items)) {
+        } else if (data?.items && Array.isArray(data.items)) {
             itemsArray = data.items;
-        } else if (data && data.marketData && Array.isArray(data.marketData)) {
+        } else if (Array.isArray(data?.marketData)) {
             itemsArray = data.marketData;
+        } else if (Array.isArray(categories)) {
+            // New shape: items are nested inside categories[].items
+            itemsArray = categories.flatMap(cat => (Array.isArray(cat?.items) ? cat.items : []));
         }
 
         if (itemsArray) {
@@ -1492,18 +1495,18 @@ class MarketViewer {
                         name: item.name || 'Unknown',
                         tier: item.tier ?? 0,
                         rarity: item.rarityStr || item.rarity || 'Common',
-                        tag: idToTag.get(String(item.id)) || 'Unknown',
+                        tag: idToTag.get(String(item.id)) || item.category || 'Unknown',
                         hasSellOrders: item.hasSellOrders || false,
                         hasBuyOrders: item.hasBuyOrders || false,
                         sellOrders: item.sellOrders || 0,
                         buyOrders: item.buyOrders || 0,
                         totalOrders: item.totalOrders || 0,
                         description: item.description || '',
-                        price: null, // Will be fetched on demand
-                        seller: null, // Will be fetched on demand
-                        claimName: null, // Will be fetched on demand
-                        regionName: null, // Will be fetched on demand
-                        regionId: null, // Will be fetched on demand
+                        price: null,
+                        seller: null,
+                        claimName: null,
+                        regionName: null,
+                        regionId: null,
                         priceLoaded: false
                     });
                 }

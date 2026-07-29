@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0036';
+const VERSION = '1.0037';
 
 // Current view state
 let currentView = 'inventory';
@@ -1511,7 +1511,7 @@ class MarketViewer {
                         name: item.name || 'Unknown',
                         tier: item.tier ?? 0,
                         rarity: item.rarityStr || item.rarity || 'Common',
-                        tag: idToTag.get(String(item.id)) || item.category || 'Unknown',
+                        tag: idToTag.get(String(item.id)) || item.tag || item.category || 'Unknown',
                         hasSellOrders: item.hasSellOrders || false,
                         hasBuyOrders: item.hasBuyOrders || false,
                         sellOrders: item.sellOrders || 0,

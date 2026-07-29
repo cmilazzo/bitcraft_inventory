@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0033';
+const VERSION = '1.0034';
 
 // Current view state
 let currentView = 'inventory';
@@ -1431,7 +1431,8 @@ class MarketViewer {
 
     async fetchMarketData() {
         try {
-            const response = await fetch(`${API_BASE}/market/__data.json?hasOrders=true&hasSellOrders=true`);
+            // /market is now a dashboard — item catalog lives at /market/browse
+            const response = await fetch(`${API_BASE}/market/browse/__data.json?x-sveltekit-invalidated=01`);
             const json = await response.json();
 
             console.log('Raw market JSON:', json);
@@ -1453,12 +1454,11 @@ class MarketViewer {
     }
 
     extractMarketItems(data) {
-        // Market data structure: the decoded data has a marketData property containing items
         const items = [];
 
-        // Build id->tag map from categories (items have no tag field, only itemType number)
+        // Build id->tag map from categories when present
         const idToTag = new Map();
-        const categories = data?.marketData?.categories;
+        const categories = data?.marketData?.categories || data?.categories;
         if (Array.isArray(categories)) {
             for (const cat of categories) {
                 if (cat && cat.name && Array.isArray(cat.items)) {
@@ -1471,20 +1471,43 @@ class MarketViewer {
             }
         }
 
-        // Items are nested inside categories — flatten them all
         let itemsArray = null;
 
         if (Array.isArray(data)) {
             itemsArray = data;
-        } else if (data?.marketData?.items && Array.isArray(data.marketData.items)) {
+        } else if (Array.isArray(data?.marketData?.items)) {
             itemsArray = data.marketData.items;
-        } else if (data?.items && Array.isArray(data.items)) {
+        } else if (Array.isArray(data?.items)) {
             itemsArray = data.items;
         } else if (Array.isArray(data?.marketData)) {
             itemsArray = data.marketData;
         } else if (Array.isArray(categories)) {
-            // New shape: items are nested inside categories[].items
+            // categories[].items shape
             itemsArray = categories.flatMap(cat => (Array.isArray(cat?.items) ? cat.items : []));
+        } else if (data?.dashboard || data?.topDeals) {
+            // Dashboard shape — pull from mostTraded + topDeals as a partial fallback
+            const seen = new Set();
+            const pool = [
+                ...(data.dashboard?.mostTraded || []),
+                ...(data.dashboard?.movers || []),
+                ...(data.topDeals || [])
+            ];
+            itemsArray = pool.filter(o => {
+                if (!o?.itemId || seen.has(String(o.itemId))) return false;
+                seen.add(String(o.itemId));
+                return true;
+            }).map(o => ({
+                id: o.itemId,
+                name: o.itemName || o.name || 'Unknown',
+                tier: o.tier ?? 0,
+                rarity: o.rarityStr || o.rarity || 'Common',
+                hasSellOrders: true,
+                hasBuyOrders: false,
+                sellOrders: o.sellOrders || 1,
+                buyOrders: 0,
+                totalOrders: o.totalOrders || 1,
+                description: '',
+            }));
         }
 
         if (itemsArray) {

@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0038';
+const VERSION = '1.0039';
 
 // Current view state
 let currentView = 'inventory';
@@ -1325,6 +1325,7 @@ class MarketViewer {
         this.searchTerm = '';
         this.locationFilter = '';
         this.regionFilter = '';
+        this.hasOrdersOnly = true;
         this.loadFromUrl();
     }
 
@@ -1710,6 +1711,11 @@ class MarketViewer {
             filtered = filtered.filter(item =>
                 item.regionName && item.regionName.toLowerCase().includes(regionSearch)
             );
+        }
+
+        // Filter to only items with active sell orders (price loaded and non-null)
+        if (this.hasOrdersOnly) {
+            filtered = filtered.filter(item => !item.priceLoaded || item.price !== null);
         }
 
         // Sort items
@@ -2962,6 +2968,12 @@ async function renderMarketView() {
                             <label>Region:</label>
                             <input type="text" id="market-region-filter" placeholder="Filter by region...">
                         </div>
+                        <div class="control-group" style="justify-content: center;">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                                <input type="checkbox" id="market-has-orders-filter" checked>
+                                Has sell orders
+                            </label>
+                        </div>
                     </div>
                 </section>
                 <section class="inventory-display">
@@ -3351,6 +3363,7 @@ function setupMarketEventListeners() {
     document.getElementById('market-search').value = marketViewer.searchTerm;
     document.getElementById('market-location-filter').value = marketViewer.locationFilter;
     document.getElementById('market-region-filter').value = marketViewer.regionFilter;
+    document.getElementById('market-has-orders-filter').checked = marketViewer.hasOrdersOnly;
 
     // Tag pill buttons
     document.querySelectorAll('.tag-pill').forEach(pill => {
@@ -3435,6 +3448,12 @@ function setupMarketEventListeners() {
         marketViewer.updateUrl();
         renderMarketTable();
     });
+
+    // Has sell orders toggle
+    document.getElementById('market-has-orders-filter').addEventListener('change', (e) => {
+        marketViewer.hasOrdersOnly = e.target.checked;
+        renderMarketTable();
+    });
 }
 
 async function renderMarketTable() {
@@ -3499,11 +3518,11 @@ async function renderMarketTable() {
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
-                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="seller-value">${item.seller || '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="location-value">${item.priceLoaded ? (item.claimName ? escapeHtml(item.claimName) : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="region-value">${item.priceLoaded ? (item.regionName ? `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : 'N/A') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="count-value">${item.priceLoaded && item.quantity != null ? item.quantity.toLocaleString() : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : '—') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="seller-value">${item.priceLoaded ? (item.seller || '—') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="location-value">${item.priceLoaded ? (item.claimName ? escapeHtml(item.claimName) : '—') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="region-value">${item.priceLoaded ? (item.regionName ? `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : '—') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="count-value">${item.priceLoaded ? (item.quantity != null ? item.quantity.toLocaleString() : '—') : '<span class="loading-text">Loading...</span>'}</td>
                     </tr>
                 `).join('')}
             </tbody>

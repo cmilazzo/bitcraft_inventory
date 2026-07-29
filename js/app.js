@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0039';
+const VERSION = '1.0040';
 
 // Current view state
 let currentView = 'inventory';
@@ -1325,7 +1325,6 @@ class MarketViewer {
         this.searchTerm = '';
         this.locationFilter = '';
         this.regionFilter = '';
-        this.hasOrdersOnly = true;
         this.loadFromUrl();
     }
 
@@ -1713,10 +1712,8 @@ class MarketViewer {
             );
         }
 
-        // Filter to only items with active sell orders (price loaded and non-null)
-        if (this.hasOrdersOnly) {
-            filtered = filtered.filter(item => !item.priceLoaded || item.price !== null);
-        }
+        // Only show items with active sell orders
+        filtered = filtered.filter(item => !item.priceLoaded || item.price !== null);
 
         // Sort items
         filtered.sort((a, b) => {
@@ -2968,12 +2965,6 @@ async function renderMarketView() {
                             <label>Region:</label>
                             <input type="text" id="market-region-filter" placeholder="Filter by region...">
                         </div>
-                        <div class="control-group" style="justify-content: center;">
-                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                                <input type="checkbox" id="market-has-orders-filter" checked>
-                                Has sell orders
-                            </label>
-                        </div>
                     </div>
                 </section>
                 <section class="inventory-display">
@@ -3363,7 +3354,6 @@ function setupMarketEventListeners() {
     document.getElementById('market-search').value = marketViewer.searchTerm;
     document.getElementById('market-location-filter').value = marketViewer.locationFilter;
     document.getElementById('market-region-filter').value = marketViewer.regionFilter;
-    document.getElementById('market-has-orders-filter').checked = marketViewer.hasOrdersOnly;
 
     // Tag pill buttons
     document.querySelectorAll('.tag-pill').forEach(pill => {
@@ -3449,11 +3439,6 @@ function setupMarketEventListeners() {
         renderMarketTable();
     });
 
-    // Has sell orders toggle
-    document.getElementById('market-has-orders-filter').addEventListener('change', (e) => {
-        marketViewer.hasOrdersOnly = e.target.checked;
-        renderMarketTable();
-    });
 }
 
 async function renderMarketTable() {

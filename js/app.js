@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0035';
+const VERSION = '1.0036';
 
 // Current view state
 let currentView = 'inventory';
@@ -1431,22 +1431,14 @@ class MarketViewer {
 
     async fetchMarketData() {
         try {
-            // /market is now a dashboard — try item catalog routes
-            const response = await fetch(`${API_BASE}/market/items/__data.json?x-sveltekit-invalidated=01`);
+            // Plain REST catalog endpoint (not a SvelteKit route)
+            const response = await fetch(`${API_BASE}/api/market/catalog`);
+            if (!response.ok) throw new Error(`Catalog fetch failed: ${response.status}`);
             const json = await response.json();
 
-            console.log('Raw market JSON:', json);
-            console.log('Raw market nodes:', JSON.stringify(json?.nodes?.map(n => n ? {type: n.type, hasData: !!n.data, dataLen: n.data?.length} : null)));
+            console.log('Raw catalog JSON type:', typeof json, Array.isArray(json), json ? Object.keys(json) : null);
 
-            // Use the same devalue decoder as InventoryViewer
-            const decoded = viewer.decodeSvelteKitData(json);
-
-            console.log('Decoded market data:', decoded);
-            console.log('Decoded data type:', typeof decoded, Array.isArray(decoded));
-            console.log('Decoded data keys:', decoded ? Object.keys(decoded) : 'null');
-
-            // Extract items from the decoded data structure
-            this.items = this.extractMarketItems(decoded);
+            this.items = this.extractMarketItems(json);
             return this.items;
         } catch (error) {
             console.error('Error fetching market data:', error);

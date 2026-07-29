@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0034';
+const VERSION = '1.0035';
 
 // Current view state
 let currentView = 'inventory';
@@ -1431,11 +1431,12 @@ class MarketViewer {
 
     async fetchMarketData() {
         try {
-            // /market is now a dashboard — item catalog lives at /market/browse
-            const response = await fetch(`${API_BASE}/market/browse/__data.json?x-sveltekit-invalidated=01`);
+            // /market is now a dashboard — try item catalog routes
+            const response = await fetch(`${API_BASE}/market/items/__data.json?x-sveltekit-invalidated=01`);
             const json = await response.json();
 
             console.log('Raw market JSON:', json);
+            console.log('Raw market nodes:', JSON.stringify(json?.nodes?.map(n => n ? {type: n.type, hasData: !!n.data, dataLen: n.data?.length} : null)));
 
             // Use the same devalue decoder as InventoryViewer
             const decoded = viewer.decodeSvelteKitData(json);

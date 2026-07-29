@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0037';
+const VERSION = '1.0038';
 
 // Current view state
 let currentView = 'inventory';
@@ -1602,7 +1602,7 @@ class MarketViewer {
 
     async loadPricesForVisibleItems(items) {
         // Only fetch prices for items that don't have them yet
-        const itemsNeedingPrices = items.filter(item => !item.priceLoaded && item.hasSellOrders);
+        const itemsNeedingPrices = items.filter(item => !item.priceLoaded);
 
         if (itemsNeedingPrices.length === 0) {
             return;

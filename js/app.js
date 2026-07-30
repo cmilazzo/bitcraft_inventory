@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0044';
+const VERSION = '1.0045';
 
 // Current view state
 let currentView = 'inventory';
@@ -1323,8 +1323,8 @@ class MarketViewer {
         this.sortBy = 'name';
         this.sortOrder = 'asc';
         this.searchTerm = '';
-        this.locationFilter = '';
         this.regionFilter = '';
+        this.sellerFilter = '';
         this.loadFromUrl();
     }
 
@@ -1360,17 +1360,11 @@ class MarketViewer {
             this.searchTerm = search;
         }
 
-        // Load location filter (market-specific parameter)
-        const location = params.get('mkt_location');
-        if (location) {
-            this.locationFilter = location;
-        }
-
-        // Load region filter (market-specific parameter)
         const region = params.get('mkt_region');
-        if (region) {
-            this.regionFilter = region;
-        }
+        if (region) this.regionFilter = region;
+
+        const seller = params.get('mkt_seller');
+        if (seller) this.sellerFilter = seller;
     }
 
     updateUrl() {
@@ -1410,19 +1404,11 @@ class MarketViewer {
             params.delete('mkt_search');
         }
 
-        // Update location filter (market-specific parameter)
-        if (this.locationFilter) {
-            params.set('mkt_location', this.locationFilter);
-        } else {
-            params.delete('mkt_location');
-        }
+        if (this.regionFilter) params.set('mkt_region', this.regionFilter);
+        else params.delete('mkt_region');
 
-        // Update region filter (market-specific parameter)
-        if (this.regionFilter) {
-            params.set('mkt_region', this.regionFilter);
-        } else {
-            params.delete('mkt_region');
-        }
+        if (this.sellerFilter) params.set('mkt_seller', this.sellerFilter);
+        else params.delete('mkt_seller');
 
         // Update URL without reload
         const newUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
@@ -1461,7 +1447,10 @@ class MarketViewer {
                     rarity: meta.rarityStr || 'Common',
                     tag: meta.tag || 'Unknown',
                     price: null,
-                    highestBuy: null,
+                    quantity: null,
+                    seller: null,
+                    regionName: null,
+                    regionId: null,
                     priceLoaded: false
                 };
             }).filter(Boolean);
@@ -1481,13 +1470,22 @@ class MarketViewer {
             const decoded = viewer.decodeSvelteKitData(json);
             if (!decoded) return null;
 
-            const stats = decoded.marketItem?.marketStats || decoded.marketStats;
-            const lowestSell = stats?.lowestSell ?? null;
-            const highestBuy = stats?.highestBuy ?? null;
+            const sellOrders = decoded.marketItem?.sellOrders;
+            if (!Array.isArray(sellOrders) || sellOrders.length === 0) return null;
 
-            if (lowestSell === null) return null;
+            const sorted = sellOrders
+                .map(o => ({ price: parseFloat(o.priceThreshold), quantity: parseInt(o.quantity) || 1, seller: o.ownerUsername || '', regionName: o.regionName || '', regionId: o.regionId || null }))
+                .filter(o => !isNaN(o.price) && o.price > 0)
+                .sort((a, b) => a.price - b.price);
 
-            return { price: lowestSell, highestBuy };
+            if (sorted.length === 0) return null;
+
+            const cheapest = sorted[0].price;
+            const atCheapest = sorted.filter(o => o.price === cheapest);
+            const quantity = atCheapest.reduce((s, o) => s + o.quantity, 0);
+            const first = atCheapest[0];
+
+            return { price: cheapest, quantity, seller: first.seller, regionName: first.regionName, regionId: first.regionId };
         } catch (error) {
             console.error(`Error fetching price for item ${itemId}:`, error);
             return null;
@@ -1509,7 +1507,10 @@ class MarketViewer {
             await Promise.all(batch.map(async (item) => {
                 const priceData = await this.fetchItemPrice(item.id);
                 item.price = priceData?.price ?? null;
-                item.highestBuy = priceData?.highestBuy ?? null;
+                item.quantity = priceData?.quantity ?? null;
+                item.seller = priceData?.seller ?? null;
+                item.regionName = priceData?.regionName ?? null;
+                item.regionId = priceData?.regionId ?? null;
                 item.priceLoaded = true;
             }));
         }
@@ -1577,20 +1578,14 @@ class MarketViewer {
             filtered = filtered.filter(item => item.name.toLowerCase().includes(search));
         }
 
-        // Filter by location
-        if (this.locationFilter) {
-            const locationSearch = this.locationFilter.toLowerCase();
-            filtered = filtered.filter(item =>
-                item.claimName && item.claimName.toLowerCase().includes(locationSearch)
-            );
+        if (this.regionFilter) {
+            const r = this.regionFilter.toLowerCase();
+            filtered = filtered.filter(item => item.regionName && item.regionName.toLowerCase().includes(r));
         }
 
-        // Filter by region
-        if (this.regionFilter) {
-            const regionSearch = this.regionFilter.toLowerCase();
-            filtered = filtered.filter(item =>
-                item.regionName && item.regionName.toLowerCase().includes(regionSearch)
-            );
+        if (this.sellerFilter) {
+            const s = this.sellerFilter.toLowerCase();
+            filtered = filtered.filter(item => item.seller && item.seller.toLowerCase().includes(s));
         }
 
         // Only show items with active sell orders
@@ -1609,10 +1604,12 @@ class MarketViewer {
                 comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
             } else if (this.sortBy === 'price') {
                 comparison = (a.price ?? Infinity) - (b.price ?? Infinity);
-            } else if (this.sortBy === 'buyprice') {
-                comparison = (b.highestBuy ?? -Infinity) - (a.highestBuy ?? -Infinity);
             } else if (this.sortBy === 'quantity') {
-                comparison = (a.price ?? Infinity) - (b.price ?? Infinity);
+                comparison = (b.quantity ?? 0) - (a.quantity ?? 0);
+            } else if (this.sortBy === 'seller') {
+                comparison = (a.seller || '').localeCompare(b.seller || '');
+            } else if (this.sortBy === 'region') {
+                comparison = (a.regionName || '').localeCompare(b.regionName || '');
             } else if (this.sortBy === 'location') {
                 const aLocation = a.claimName || '';
                 const bLocation = b.claimName || '';
@@ -2821,7 +2818,9 @@ async function renderMarketView() {
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
                                 <option value="price">Lowest Sell</option>
-                                <option value="buyprice">Highest Buy</option>
+                                <option value="quantity">Available</option>
+                                <option value="seller">Seller</option>
+                                <option value="region">Region</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -2834,6 +2833,14 @@ async function renderMarketView() {
                         <div class="control-group">
                             <label>Search:</label>
                             <input type="text" id="market-search" placeholder="Search items...">
+                        </div>
+                        <div class="control-group">
+                            <label>Region:</label>
+                            <input type="text" id="market-region-filter" placeholder="Filter by region...">
+                        </div>
+                        <div class="control-group">
+                            <label>Seller:</label>
+                            <input type="text" id="market-seller-filter" placeholder="Filter by seller...">
                         </div>
                     </div>
                 </section>
@@ -3222,6 +3229,8 @@ function setupMarketEventListeners() {
     document.getElementById('market-sort-by').value = marketViewer.sortBy;
     document.getElementById('market-sort-order').value = marketViewer.sortOrder;
     document.getElementById('market-search').value = marketViewer.searchTerm;
+    document.getElementById('market-region-filter').value = marketViewer.regionFilter;
+    document.getElementById('market-seller-filter').value = marketViewer.sellerFilter;
 
     // Tag pill buttons
     document.querySelectorAll('.tag-pill').forEach(pill => {
@@ -3293,7 +3302,17 @@ function setupMarketEventListeners() {
         renderMarketTable();
     });
 
+    document.getElementById('market-region-filter').addEventListener('input', (e) => {
+        marketViewer.regionFilter = e.target.value;
+        marketViewer.updateUrl();
+        renderMarketTable();
+    });
 
+    document.getElementById('market-seller-filter').addEventListener('input', (e) => {
+        marketViewer.sellerFilter = e.target.value;
+        marketViewer.updateUrl();
+        renderMarketTable();
+    });
 }
 
 async function renderMarketTable() {
@@ -3341,7 +3360,9 @@ async function renderMarketTable() {
                     <th class="sortable-header" data-sort="rarity" style="cursor: pointer;">Rarity${getSortIndicator('rarity')}</th>
                     <th>Tag/Type</th>
                     <th class="sortable-header" data-sort="price" style="cursor: pointer;">Lowest Sell${getSortIndicator('price')}</th>
-                    <th class="sortable-header" data-sort="buyprice" style="cursor: pointer;">Highest Buy${getSortIndicator('buyprice')}</th>
+                    <th class="sortable-header" data-sort="quantity" style="cursor: pointer;">Available${getSortIndicator('quantity')}</th>
+                    <th class="sortable-header" data-sort="seller" style="cursor: pointer;">Seller${getSortIndicator('seller')}</th>
+                    <th class="sortable-header" data-sort="region" style="cursor: pointer;">Region${getSortIndicator('region')}</th>
                 </tr>
             </thead>
             <tbody id="market-table-body">
@@ -3355,8 +3376,10 @@ async function renderMarketTable() {
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
-                        <td class="price-value">${item.price != null ? item.price.toLocaleString() : '—'}</td>
-                        <td class="price-value">${item.highestBuy != null ? item.highestBuy.toLocaleString() : '—'}</td>
+                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : '—') : '<span class="loading-text">...</span>'}</td>
+                        <td class="count-value">${item.priceLoaded ? (item.quantity != null ? item.quantity.toLocaleString() : '—') : '<span class="loading-text">...</span>'}</td>
+                        <td class="seller-value">${item.priceLoaded ? (item.seller || '—') : '<span class="loading-text">...</span>'}</td>
+                        <td class="region-value">${item.priceLoaded ? (item.regionName ? `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : '—') : '<span class="loading-text">...</span>'}</td>
                     </tr>
                 `).join('')}
             </tbody>

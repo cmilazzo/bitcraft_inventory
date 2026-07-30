@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0043';
+const VERSION = '1.0044';
 
 // Current view state
 let currentView = 'inventory';
@@ -1431,7 +1431,7 @@ class MarketViewer {
 
     async fetchMarketData() {
         try {
-            // Step 1: fetch catalog metadata and active-order flags in parallel
+            // Fetch catalog metadata and active-order flags in parallel
             const [catalogRes, flagsRes] = await Promise.all([
                 fetch(`${API_BASE}/api/market/catalog`),
                 fetch(`${API_BASE}/api/market/catalog/flags`)
@@ -1447,18 +1447,13 @@ class MarketViewer {
                 catalogMap.set(String(item.id), item);
             }
 
-            // Step 2: filter to only items with active sell orders
+            // Only include items with active sell orders (flags endpoint)
             const sellEntries = flagsJson.sell || [];
-            const itemIds = [];
-            const cargoIds = [];
-            const marketItems = [];
-
-            for (const [itemId, itemType] of sellEntries) {
+            this.items = sellEntries.map(([itemId, itemType]) => {
                 const id = String(itemId);
                 const meta = catalogMap.get(id);
-                if (!meta) continue;
-                if (itemType === 1) cargoIds.push(id); else itemIds.push(id);
-                marketItems.push({
+                if (!meta) return null;
+                return {
                     id,
                     itemType,
                     name: meta.name || 'Unknown',
@@ -1466,35 +1461,12 @@ class MarketViewer {
                     rarity: meta.rarityStr || 'Common',
                     tag: meta.tag || 'Unknown',
                     price: null,
-                    lowestSell: null,
                     highestBuy: null,
                     priceLoaded: false
-                });
-            }
+                };
+            }).filter(Boolean);
 
-            // Step 3: bulk price lookup — one POST for all active items
-            const pricesRes = await fetch(`${API_BASE}/api/market/prices/bulk`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ itemIds, cargoIds })
-            });
-
-            if (pricesRes.ok) {
-                const pricesJson = await pricesRes.json();
-                const priceData = pricesJson.data || pricesJson;
-                for (const item of marketItems) {
-                    const p = (item.itemType === 1 ? priceData.cargo : priceData.items)?.[item.id];
-                    if (p) {
-                        item.price = p.lowestSellPrice ?? null;
-                        item.lowestSell = p.lowestSellPrice ?? null;
-                        item.highestBuy = p.highestBuyPrice ?? null;
-                    }
-                    item.priceLoaded = true;
-                }
-            }
-
-            this.items = marketItems.filter(item => item.price !== null);
-            console.log(`Market: ${sellEntries.length} active sell items, ${this.items.length} with prices`);
+            console.log(`Market: ${this.items.length} items with active sell orders`);
             return this.items;
         } catch (error) {
             console.error('Error fetching market data:', error);
@@ -1507,62 +1479,15 @@ class MarketViewer {
             const response = await fetch(`${API_BASE}/market/item/${itemId}/__data.json?hasOrders=true&hasSellOrders=true&x-sveltekit-invalidated=001`);
             const json = await response.json();
             const decoded = viewer.decodeSvelteKitData(json);
+            if (!decoded) return null;
 
-            console.log(`[Item ${itemId}] Decoded structure:`, decoded);
-            console.log(`[Item ${itemId}] Decoded keys:`, decoded ? Object.keys(decoded) : 'null');
+            const stats = decoded.marketItem?.marketStats || decoded.marketStats;
+            const lowestSell = stats?.lowestSell ?? null;
+            const highestBuy = stats?.highestBuy ?? null;
 
-            if (!decoded) {
-                return null;
-            }
+            if (lowestSell === null) return null;
 
-            const sellOrders = decoded.marketItem?.sellOrders;
-
-            if (!Array.isArray(sellOrders) || sellOrders.length === 0) {
-                return null;
-            }
-
-            if (sellOrders.length > 0) {
-                // Extract prices from priceThreshold property and find the lowest
-                const ordersWithPrices = sellOrders
-                    .map(order => ({
-                        price: parseFloat(order.priceThreshold),
-                        quantity: parseInt(order.quantity) || 1,
-                        seller: order.ownerUsername || 'Unknown',
-                        claimName: order.claimName || 'Unknown',
-                        regionName: order.regionName || 'Unknown',
-                        regionId: order.regionId || null
-                    }))
-                    .filter(order => !isNaN(order.price) && order.price > 0)
-                    .sort((a, b) => a.price - b.price);
-
-                console.log(`[Item ${itemId}] Orders with prices:`, ordersWithPrices);
-
-                if (ordersWithPrices.length > 0) {
-                    const cheapestPrice = ordersWithPrices[0].price;
-
-                    // Find all orders at the cheapest price
-                    const ordersAtCheapestPrice = ordersWithPrices.filter(order => order.price === cheapestPrice);
-
-                    // Sum up quantities from all orders at the cheapest price
-                    const totalQuantity = ordersAtCheapestPrice.reduce((sum, order) => sum + order.quantity, 0);
-
-                    // Use the first order's location/seller info
-                    const firstOrder = ordersAtCheapestPrice[0];
-
-                    console.log(`[Item ${itemId}] Cheapest price: ${cheapestPrice}, Orders at this price: ${ordersAtCheapestPrice.length}, Total quantity: ${totalQuantity}`);
-
-                    return {
-                        price: cheapestPrice,
-                        quantity: totalQuantity,
-                        seller: firstOrder.seller,
-                        claimName: firstOrder.claimName,
-                        regionName: firstOrder.regionName,
-                        regionId: firstOrder.regionId
-                    };
-                }
-            }
-
-            return null;
+            return { price: lowestSell, highestBuy };
         } catch (error) {
             console.error(`Error fetching price for item ${itemId}:`, error);
             return null;
@@ -1583,21 +1508,8 @@ class MarketViewer {
             const batch = itemsNeedingPrices.slice(i, i + batchSize);
             await Promise.all(batch.map(async (item) => {
                 const priceData = await this.fetchItemPrice(item.id);
-                if (priceData) {
-                    item.price = priceData.price;
-                    item.quantity = priceData.quantity;
-                    item.seller = priceData.seller;
-                    item.claimName = priceData.claimName;
-                    item.regionName = priceData.regionName;
-                    item.regionId = priceData.regionId;
-                } else {
-                    item.price = null;
-                    item.quantity = null;
-                    item.seller = null;
-                    item.claimName = null;
-                    item.regionName = null;
-                    item.regionId = null;
-                }
+                item.price = priceData?.price ?? null;
+                item.highestBuy = priceData?.highestBuy ?? null;
                 item.priceLoaded = true;
             }));
         }
@@ -3470,6 +3382,11 @@ async function renderMarketTable() {
         });
     });
 
+    // Lazy-load prices for this filtered set, then re-render once to drop no-order rows
+    const hadUnloaded = items.some(item => !item.priceLoaded);
+    if (hadUnloaded) {
+        marketViewer.loadPricesForVisibleItems(items).then(() => renderMarketTable());
+    }
 }
 
 function escapeHtml(text) {

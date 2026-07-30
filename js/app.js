@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0041';
+const VERSION = '1.0042';
 
 // Current view state
 let currentView = 'inventory';
@@ -3533,9 +3533,10 @@ async function renderMarketTable() {
         });
     });
 
-    // Load prices asynchronously, then re-render to apply the has-orders filter
+    // Load prices, then re-render once to apply the has-orders filter
+    const hadUnloaded = items.some(item => !item.priceLoaded);
     await marketViewer.loadPricesForVisibleItems(items);
-    renderMarketTable();
+    if (hadUnloaded) renderMarketTable();
 }
 
 function escapeHtml(text) {

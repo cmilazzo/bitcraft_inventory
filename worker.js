@@ -13,7 +13,7 @@ async function handleRequest(request) {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
         },
       });
@@ -23,12 +23,19 @@ async function handleRequest(request) {
     const path = url.pathname.replace('/proxy/', '');
     const targetUrl = `https://bitjita.com/${path}${url.search}`;
 
+    const fetchInit = {
+      method: request.method,
+      headers: {
+        'User-Agent': 'BitcraftInventoryViewer/1.0',
+        'Content-Type': request.headers.get('Content-Type') || 'application/json',
+      },
+    };
+    if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
+      fetchInit.body = await request.text();
+    }
+
     try {
-      const response = await fetch(targetUrl, {
-        headers: {
-          'User-Agent': 'BitcraftInventoryViewer/1.0',
-        },
-      });
+      const response = await fetch(targetUrl, fetchInit);
 
       const data = await response.text();
 

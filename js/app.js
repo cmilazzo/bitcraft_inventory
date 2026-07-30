@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0042';
+const VERSION = '1.0043';
 
 // Current view state
 let currentView = 'inventory';
@@ -1431,106 +1431,75 @@ class MarketViewer {
 
     async fetchMarketData() {
         try {
-            // Plain REST catalog endpoint (not a SvelteKit route)
-            const response = await fetch(`${API_BASE}/api/market/catalog`);
-            if (!response.ok) throw new Error(`Catalog fetch failed: ${response.status}`);
-            const json = await response.json();
+            // Step 1: fetch catalog metadata and active-order flags in parallel
+            const [catalogRes, flagsRes] = await Promise.all([
+                fetch(`${API_BASE}/api/market/catalog`),
+                fetch(`${API_BASE}/api/market/catalog/flags`)
+            ]);
+            if (!catalogRes.ok) throw new Error(`Catalog fetch failed: ${catalogRes.status}`);
+            if (!flagsRes.ok) throw new Error(`Flags fetch failed: ${flagsRes.status}`);
 
-            console.log('Raw catalog JSON type:', typeof json, Array.isArray(json), json ? Object.keys(json) : null);
+            const [catalogJson, flagsJson] = await Promise.all([catalogRes.json(), flagsRes.json()]);
 
-            this.items = this.extractMarketItems(json);
+            // Build lookup: id -> catalog item
+            const catalogMap = new Map();
+            for (const item of (catalogJson.items || [])) {
+                catalogMap.set(String(item.id), item);
+            }
+
+            // Step 2: filter to only items with active sell orders
+            const sellEntries = flagsJson.sell || [];
+            const itemIds = [];
+            const cargoIds = [];
+            const marketItems = [];
+
+            for (const [itemId, itemType] of sellEntries) {
+                const id = String(itemId);
+                const meta = catalogMap.get(id);
+                if (!meta) continue;
+                if (itemType === 1) cargoIds.push(id); else itemIds.push(id);
+                marketItems.push({
+                    id,
+                    itemType,
+                    name: meta.name || 'Unknown',
+                    tier: meta.tier ?? 0,
+                    rarity: meta.rarityStr || 'Common',
+                    tag: meta.tag || 'Unknown',
+                    price: null,
+                    lowestSell: null,
+                    highestBuy: null,
+                    priceLoaded: false
+                });
+            }
+
+            // Step 3: bulk price lookup — one POST for all active items
+            const pricesRes = await fetch(`${API_BASE}/api/market/prices/bulk`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ itemIds, cargoIds })
+            });
+
+            if (pricesRes.ok) {
+                const pricesJson = await pricesRes.json();
+                const priceData = pricesJson.data || pricesJson;
+                for (const item of marketItems) {
+                    const p = (item.itemType === 1 ? priceData.cargo : priceData.items)?.[item.id];
+                    if (p) {
+                        item.price = p.lowestSellPrice ?? null;
+                        item.lowestSell = p.lowestSellPrice ?? null;
+                        item.highestBuy = p.highestBuyPrice ?? null;
+                    }
+                    item.priceLoaded = true;
+                }
+            }
+
+            this.items = marketItems.filter(item => item.price !== null);
+            console.log(`Market: ${sellEntries.length} active sell items, ${this.items.length} with prices`);
             return this.items;
         } catch (error) {
             console.error('Error fetching market data:', error);
             throw error;
         }
-    }
-
-    extractMarketItems(data) {
-        const items = [];
-
-        // Build id->tag map from categories when present
-        const idToTag = new Map();
-        const categories = data?.marketData?.categories || data?.categories;
-        if (Array.isArray(categories)) {
-            for (const cat of categories) {
-                if (cat && cat.name && Array.isArray(cat.items)) {
-                    for (const catItem of cat.items) {
-                        if (catItem && catItem.id) {
-                            idToTag.set(String(catItem.id), cat.name);
-                        }
-                    }
-                }
-            }
-        }
-
-        let itemsArray = null;
-
-        if (Array.isArray(data)) {
-            itemsArray = data;
-        } else if (Array.isArray(data?.marketData?.items)) {
-            itemsArray = data.marketData.items;
-        } else if (Array.isArray(data?.items)) {
-            itemsArray = data.items;
-        } else if (Array.isArray(data?.marketData)) {
-            itemsArray = data.marketData;
-        } else if (Array.isArray(categories)) {
-            // categories[].items shape
-            itemsArray = categories.flatMap(cat => (Array.isArray(cat?.items) ? cat.items : []));
-        } else if (data?.dashboard || data?.topDeals) {
-            // Dashboard shape — pull from mostTraded + topDeals as a partial fallback
-            const seen = new Set();
-            const pool = [
-                ...(data.dashboard?.mostTraded || []),
-                ...(data.dashboard?.movers || []),
-                ...(data.topDeals || [])
-            ];
-            itemsArray = pool.filter(o => {
-                if (!o?.itemId || seen.has(String(o.itemId))) return false;
-                seen.add(String(o.itemId));
-                return true;
-            }).map(o => ({
-                id: o.itemId,
-                name: o.itemName || o.name || 'Unknown',
-                tier: o.tier ?? 0,
-                rarity: o.rarityStr || o.rarity || 'Common',
-                hasSellOrders: true,
-                hasBuyOrders: false,
-                sellOrders: o.sellOrders || 1,
-                buyOrders: 0,
-                totalOrders: o.totalOrders || 1,
-                description: '',
-            }));
-        }
-
-        if (itemsArray) {
-            for (const item of itemsArray) {
-                if (item && typeof item === 'object' && item.name) {
-                    items.push({
-                        id: item.id || '',
-                        name: item.name || 'Unknown',
-                        tier: item.tier ?? 0,
-                        rarity: item.rarityStr || item.rarity || 'Common',
-                        tag: idToTag.get(String(item.id)) || item.tag || item.category || 'Unknown',
-                        hasSellOrders: item.hasSellOrders || false,
-                        hasBuyOrders: item.hasBuyOrders || false,
-                        sellOrders: item.sellOrders || 0,
-                        buyOrders: item.buyOrders || 0,
-                        totalOrders: item.totalOrders || 0,
-                        description: item.description || '',
-                        price: null,
-                        seller: null,
-                        claimName: null,
-                        regionName: null,
-                        regionId: null,
-                        priceLoaded: false
-                    });
-                }
-            }
-        }
-
-        console.log(`Extracted ${items.length} market items`);
-        return items;
     }
 
     async fetchItemPrice(itemId) {
@@ -1727,12 +1696,11 @@ class MarketViewer {
                 const rarityOrder = { 'Common': 1, 'Uncommon': 2, 'Rare': 3, 'Epic': 4, 'Legendary': 5, 'Mythic': 6 };
                 comparison = (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0);
             } else if (this.sortBy === 'price') {
-                // Sort by price, treating null as highest value
-                const aPrice = a.price ?? Infinity;
-                const bPrice = b.price ?? Infinity;
-                comparison = aPrice - bPrice;
+                comparison = (a.price ?? Infinity) - (b.price ?? Infinity);
+            } else if (this.sortBy === 'buyprice') {
+                comparison = (b.highestBuy ?? -Infinity) - (a.highestBuy ?? -Infinity);
             } else if (this.sortBy === 'quantity') {
-                comparison = a.sellOrders - b.sellOrders;
+                comparison = (a.price ?? Infinity) - (b.price ?? Infinity);
             } else if (this.sortBy === 'location') {
                 const aLocation = a.claimName || '';
                 const bLocation = b.claimName || '';
@@ -2940,10 +2908,8 @@ async function renderMarketView() {
                                 <option value="name">Name</option>
                                 <option value="tier">Tier</option>
                                 <option value="rarity">Rarity</option>
-                                <option value="price">Price</option>
-                                <option value="location">Location</option>
-                                <option value="region">Region</option>
-                                <option value="quantity">Quantity</option>
+                                <option value="price">Lowest Sell</option>
+                                <option value="buyprice">Highest Buy</option>
                             </select>
                         </div>
                         <div class="control-group">
@@ -2956,14 +2922,6 @@ async function renderMarketView() {
                         <div class="control-group">
                             <label>Search:</label>
                             <input type="text" id="market-search" placeholder="Search items...">
-                        </div>
-                        <div class="control-group">
-                            <label>Location:</label>
-                            <input type="text" id="market-location-filter" placeholder="Filter by location...">
-                        </div>
-                        <div class="control-group">
-                            <label>Region:</label>
-                            <input type="text" id="market-region-filter" placeholder="Filter by region...">
                         </div>
                     </div>
                 </section>
@@ -3352,8 +3310,6 @@ function setupMarketEventListeners() {
     document.getElementById('market-sort-by').value = marketViewer.sortBy;
     document.getElementById('market-sort-order').value = marketViewer.sortOrder;
     document.getElementById('market-search').value = marketViewer.searchTerm;
-    document.getElementById('market-location-filter').value = marketViewer.locationFilter;
-    document.getElementById('market-region-filter').value = marketViewer.regionFilter;
 
     // Tag pill buttons
     document.querySelectorAll('.tag-pill').forEach(pill => {
@@ -3425,19 +3381,6 @@ function setupMarketEventListeners() {
         renderMarketTable();
     });
 
-    // Location filter
-    document.getElementById('market-location-filter').addEventListener('input', (e) => {
-        marketViewer.locationFilter = e.target.value;
-        marketViewer.updateUrl();
-        renderMarketTable();
-    });
-
-    // Region filter
-    document.getElementById('market-region-filter').addEventListener('input', (e) => {
-        marketViewer.regionFilter = e.target.value;
-        marketViewer.updateUrl();
-        renderMarketTable();
-    });
 
 }
 
@@ -3485,11 +3428,8 @@ async function renderMarketTable() {
                     <th class="sortable-header" data-sort="tier" style="cursor: pointer;">Tier${getSortIndicator('tier')}</th>
                     <th class="sortable-header" data-sort="rarity" style="cursor: pointer;">Rarity${getSortIndicator('rarity')}</th>
                     <th>Tag/Type</th>
-                    <th class="sortable-header" data-sort="price" style="cursor: pointer;">Price${getSortIndicator('price')}</th>
-                    <th>Seller</th>
-                    <th class="sortable-header" data-sort="location" style="cursor: pointer;">Location${getSortIndicator('location')}</th>
-                    <th class="sortable-header" data-sort="region" style="cursor: pointer;">Region${getSortIndicator('region')}</th>
-                    <th class="sortable-header" data-sort="quantity" style="cursor: pointer;">Available${getSortIndicator('quantity')}</th>
+                    <th class="sortable-header" data-sort="price" style="cursor: pointer;">Lowest Sell${getSortIndicator('price')}</th>
+                    <th class="sortable-header" data-sort="buyprice" style="cursor: pointer;">Highest Buy${getSortIndicator('buyprice')}</th>
                 </tr>
             </thead>
             <tbody id="market-table-body">
@@ -3503,11 +3443,8 @@ async function renderMarketTable() {
                         <td><span class="tier-badge">T${item.tier}</span></td>
                         <td><span class="rarity-${item.rarity.toLowerCase()}">${item.rarity}</span></td>
                         <td>${escapeHtml(item.tag)}</td>
-                        <td class="price-value">${item.priceLoaded ? (item.price != null ? item.price.toLocaleString() : '—') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="seller-value">${item.priceLoaded ? (item.seller || '—') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="location-value">${item.priceLoaded ? (item.claimName ? escapeHtml(item.claimName) : '—') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="region-value">${item.priceLoaded ? (item.regionName ? `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}` : '—') : '<span class="loading-text">Loading...</span>'}</td>
-                        <td class="count-value">${item.priceLoaded ? (item.quantity != null ? item.quantity.toLocaleString() : '—') : '<span class="loading-text">Loading...</span>'}</td>
+                        <td class="price-value">${item.price != null ? item.price.toLocaleString() : '—'}</td>
+                        <td class="price-value">${item.highestBuy != null ? item.highestBuy.toLocaleString() : '—'}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -3533,10 +3470,6 @@ async function renderMarketTable() {
         });
     });
 
-    // Load prices, then re-render once to apply the has-orders filter
-    const hadUnloaded = items.some(item => !item.priceLoaded);
-    await marketViewer.loadPricesForVisibleItems(items);
-    if (hadUnloaded) renderMarketTable();
 }
 
 function escapeHtml(text) {

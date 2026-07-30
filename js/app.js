@@ -3,7 +3,7 @@
 
 const API_BASE = 'https://bcproxy.bitcraft-data.com/proxy';
 const PROFESSION_API = 'https://jkrsrzoom7.execute-api.us-east-1.amazonaws.com/prod/profession-history';
-const VERSION = '1.0040';
+const VERSION = '1.0041';
 
 // Current view state
 let currentView = 'inventory';
@@ -3533,43 +3533,9 @@ async function renderMarketTable() {
         });
     });
 
-    // Load prices asynchronously
+    // Load prices asynchronously, then re-render to apply the has-orders filter
     await marketViewer.loadPricesForVisibleItems(items);
-
-    // Update the table with loaded prices
-    const tbody = document.getElementById('market-table-body');
-    if (tbody) {
-        items.forEach(item => {
-            const row = tbody.querySelector(`tr[data-item-id="${item.id}"]`);
-            if (row) {
-                const priceCell = row.querySelector('.price-value');
-                const sellerCell = row.querySelector('.seller-value');
-                const locationCell = row.querySelector('.location-value');
-                const regionCell = row.querySelector('.region-value');
-                const countCell = row.querySelector('.count-value');
-
-                if (priceCell) {
-                    priceCell.innerHTML = item.price != null ? item.price.toLocaleString() : 'N/A';
-                }
-                if (sellerCell) {
-                    sellerCell.textContent = item.seller || 'N/A';
-                }
-                if (locationCell) {
-                    locationCell.textContent = item.claimName ? escapeHtml(item.claimName) : 'N/A';
-                }
-                if (regionCell) {
-                    if (item.regionName) {
-                        regionCell.textContent = `${escapeHtml(item.regionName)}${item.regionId ? ' (' + item.regionId + ')' : ''}`;
-                    } else {
-                        regionCell.textContent = 'N/A';
-                    }
-                }
-                if (countCell) {
-                    countCell.textContent = item.quantity != null ? item.quantity.toLocaleString() : 'N/A';
-                }
-            }
-        });
-    }
+    renderMarketTable();
 }
 
 function escapeHtml(text) {
